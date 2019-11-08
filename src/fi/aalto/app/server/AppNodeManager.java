@@ -133,10 +133,10 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    }
 		    
 			/**P300 Pressure sensor**/
-			//UaNode P300 = getDevice(ns,"P300");
-			//UaNode parameterSet = getParameterSet(ns,"P300");
-			//UaVariable P300_measurement = getVariable(ns,"P300","ZeroMeas");
-			//createNonExclusiveLimitAlarmNode(P300_measurement , (UaObjectNode) P300, parameterSet).setMessage(new LocalizedText("P300: (L) Boiler pressure at 0.0bar(g)"));
+			UaNode P300 = getDevice(ns,"P300");
+			UaNode parameterSet = getParameterSet(ns,"P300");
+			UaVariable P300_measurement = getVariable(ns,"P300","ZeroMeas");
+			createNonExclusiveLimitAlarmNode(P300_measurement , (UaObjectNode) P300, parameterSet).setMessage(new LocalizedText("P300: (L) Boiler pressure at 0.0bar(g)"));
 			
 			/**M200 Pump**/
 			//TODO: OffNormalAlarmType
