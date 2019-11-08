@@ -38,12 +38,15 @@ import com.prosysopc.ua.nodes.UaNodeFactoryException;
 import com.prosysopc.ua.nodes.UaObjectType;
 import com.prosysopc.ua.nodes.UaReference;
 import com.prosysopc.ua.nodes.UaType;
+import com.prosysopc.ua.server.EventManagerListener;
+import com.prosysopc.ua.server.NodeManager;
 import com.prosysopc.ua.server.NodeManagerUaNode;
 import com.prosysopc.ua.server.UaInstantiationException;
 import com.prosysopc.ua.server.UaServer;
 import com.prosysopc.ua.server.UaServer.NodeManagerUaServer;
 import com.prosysopc.ua.server.instantiation.TypeDefinitionBasedNodeBuilderConfiguration;
 import com.prosysopc.ua.server.nodes.PlainVariable;
+import com.prosysopc.ua.server.nodes.UaMethodNode;
 import com.prosysopc.ua.server.nodes.UaObjectNode;
 import com.prosysopc.ua.server.nodes.UaObjectTypeNode;
 import com.prosysopc.ua.client.AddressSpace;
@@ -114,6 +117,8 @@ public class AppNodeManager extends NodeManagerUaNode {
 		        	//The variables whose name contain SetModeAuto or SetModeMan should be provided as 
 		        	//OPC UA methods according to the OPC UA Specification, 
 		        	//Part 3: Address Space Model, release 1.04.
+		        	
+		        	assignMethod(ns,var);
 		        }
 		        else if(name.contains("AlrmEvt")) {
 		        	//The variables who have the nature of alarms should be provided only as OPC UA alarms (and not as variables) 
@@ -183,6 +188,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    	System.out.println("Stack["+i+"]: '"+e.getStackTrace()[i].getMethodName()+"' at line '"+e.getStackTrace()[i].getLineNumber()+"'");
 		    }
 		    
+
 	    }
 	}
 	
@@ -215,7 +221,6 @@ public class AppNodeManager extends NodeManagerUaNode {
 		parent.addComponent(variable);
 		variable.setCurrentValue(value);
 		variable.setDescription(new LocalizedText(name)); 
-
 		return variable;
 	}
 	
@@ -266,7 +271,21 @@ public class AppNodeManager extends NodeManagerUaNode {
 		//Create and assign the variable to ParameterSet
 		NodeId varId = new NodeId(ns,names[0]+"|"+names[1]);	//Unique NodeId for each var
 		createVariable(ns,names[1],varId,nodeToAssign.getValue().getValue(),nodeToAssign.getDataTypeId(),paramSetNode);
-	}	
+	}
+	
+	private void assignMethod(int ns, UaNode nodeToAssign) throws StatusException {
+		//names[0]= device's name ; names[1]= node's name
+		String[] names = nodeToAssign.getBrowseName().getName().split("_");
+		
+		//Get the ParameterSet of the current device
+		UaNode methodSetNode = getMethodSet(ns, names[0]);
+		
+		//Create and assign the method to MethodSet
+		NodeId methId = new NodeId(ns,names[0]+"|"+names[1]);	//Unique NodeId for each method
+		UaMethodNode methNode= new UaMethodNode(this,methId,names[1],Locale.ENGLISH);//Instantiate node
+		//TODO: finish the method's attributes
+		methodSetNode.addComponent(methNode);	//Attach the method to ddevice's MethodSet
+	}
 	
 	private UaNode getDeviceSet() throws StatusException
 	{	
