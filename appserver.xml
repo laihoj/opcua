@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UANodeSet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:uax="http://opcfoundation.org/UA/2008/02/Types.xsd" xmlns="http://opcfoundation.org/UA/2011/03/UANodeSet.xsd" xmlns:s1="http://yourorganisation.org/AppServer/Types.xsd" xmlns:s2="http://opcfoundation.org/UA/DI/Types.xsd" xmlns:ua="http://unifiedautomation.com/Configuration/NodeSet.xsd" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <NamespaceUris>
+        <Uri>http://org.aalto.fi/AppServer</Uri>
+        <Uri>http://opcfoundation.org/UA/DI/</Uri>
+    </NamespaceUris>
+    <Aliases>
+        <Alias Alias="HasSubtype">i=45</Alias>
+    </Aliases>
+    <Extensions>
+        <Extension>
+            <ua:ModelInfo Tool="UaModeler" Hash="BZWuF+s4a7ww0yLl5bp7fw==" Version="1.6.2"/>
+        </Extension>
+    </Extensions>
+    <UAObjectType NodeId="ns=1;i=1002" BrowseName="1:AppDeviceType">
+        <DisplayName>AppDeviceType</DisplayName>
+        <References>
+            <Reference ReferenceType="HasSubtype" IsForward="false">ns=2;i=1002</Reference>
+        </References>
+    </UAObjectType>
+</UANodeSet>
