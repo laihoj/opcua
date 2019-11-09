@@ -23,10 +23,13 @@ import com.prosysopc.ua.stack.core.ReferenceDescription;
 import com.prosysopc.ua.stack.utils.StackUtils;
 import com.prosysopc.ua.types.opcua.BaseObjectType;
 import com.prosysopc.ua.types.opcua.NonExclusiveLimitAlarmType;
+import com.prosysopc.ua.types.opcua.OffNormalAlarmType;
+import com.prosysopc.ua.types.opcua.server.BaseEventTypeNode;
+import com.prosysopc.ua.types.opcua.server.OffNormalAlarmTypeNode;
 
 import fi.aalto.app.AppDeviceType;
 import fi.aalto.app.Ids;
-import jdk.internal.org.objectweb.asm.tree.MethodNode;
+//import jdk.internal.org.objectweb.asm.tree.MethodNode;
 import opc.ua.di.TopologyElementType;
 import opc.ua.di.UIElementType;
 import opc.ua.di.client.UIElementTypeImpl;
@@ -70,6 +73,8 @@ public class AppNodeManager extends NodeManagerUaNode {
 		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.TopologyElementType, UaQualifiedName.from("http://opcfoundation.org/UA/DI/", "ParameterSet")));
 		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.TopologyElementType, UaQualifiedName.from("http://opcfoundation.org/UA/DI/", "MethodSet")));
 		this.setNodeBuilderConfiguration(conf.build());
+		
+		
 	}
 
 	public void createAddressSpace(UaClient client) throws StatusException, UaInstantiationException {
@@ -148,6 +153,30 @@ public class AppNodeManager extends NodeManagerUaNode {
 			UaNode parameterSet = getParameterSet(ns,"P300");
 			UaVariable P300_measurement = getVariable(ns,"P300","ZeroMeas");
 			createNonExclusiveLimitAlarmNode(P300_measurement , (UaObjectNode) P300, parameterSet).setMessage(new LocalizedText("P300: (L) Boiler pressure at 0.0bar(g)"));
+			
+			
+			
+			this.getEventManager().setListener(new AppEventManagerListener());
+			/*manually trigger an event*/
+			OffNormalAlarmTypeNode  ev = createEvent(OffNormalAlarmTypeNode.class);
+			ev.triggerEvent(null);
+
+
+			
+			/**L300 High level alarm**/
+			UaNode L300 = getDevice(ns, "L300");
+			UaVariable L300_measurement = getVariable(ns,"L300","MeasVal");
+			
+			NodeId L300_normal_id = new NodeId(ns,"L300_normal");	//Unique NodeId for each method
+			
+			UaVariable L300_normal = new PlainVariable<UaVariable>(this, L300_normal_id, "L300_normal", LocalizedText.NO_LOCALE);
+			L300_normal.setDataTypeId(L300_measurement.getDataTypeId());
+			L300_normal.setTypeDefinitionId(Identifiers.BaseDataVariableType);
+			L300_normal.setValue(false);
+			L300_normal.setDescription(new LocalizedText("L300_normal"));
+			
+			OffNormalAlarmTypeNode alrm = createOffNormalAlarmNode(L300_measurement, L300, L300_normal_id, "L300: Boiler NOT FULL");
+			
 			
 			/**M200 Pump**/
 			//TODO: OffNormalAlarmType
@@ -331,6 +360,34 @@ public class AppNodeManager extends NodeManagerUaNode {
 		
 		srv.registerModel(fi.aalto.app.server.ServerInformationModel.MODEL);
 		srv.getAddressSpace().loadModel(new File("appserver.xml").toURI());
+	}
+	
+	private OffNormalAlarmTypeNode createOffNormalAlarmNode(UaVariable source, UaNode device, NodeId normalState, String message) throws StatusException, UaInstantiationException {
+		int ns = this.getNamespaceIndex();
+		final NodeId myAlarmId = new NodeId(ns, device.getNodeId().getValue() + "_Alrm");
+		String name = device.getBrowseName().getName() + "_Alrm";
+		
+//		TypeDefinitionBasedNodeBuilderConfiguration.Builder conf = TypeDefinitionBasedNodeBuilderConfiguration.builder();
+//		this.setNodeBuilderConfiguration(conf.build());
+
+		OffNormalAlarmTypeNode myAlarm = createInstance(OffNormalAlarmTypeNode.class, name, myAlarmId);
+		myAlarm.setSource(source);
+		myAlarm.setInput(source);
+//		myAlarm.setSourceNode(source.getNodeId());
+//		myAlarm.setInputNode(source.getNodeId());
+		myAlarm.setEnabled(true);
+		myAlarm.setNormalState(normalState);
+		myAlarm.setSuppressedOrShelved(false);
+		myAlarm.setActiveState(new LocalizedText(message));
+
+		myAlarm.setMessage(new LocalizedText(message));
+		device.addComponent(myAlarm); // addReference(...Identifiers.HasComponent...)
+
+		source.addReference(myAlarm, Identifiers.HasCondition, false);
+		device.addReference(source, Identifiers.HasEventSource, false);
+		getServer().getNodeManagerRoot().getObjectsFolder().addReference(device, Identifiers.HasNotifier, false);
+
+		   return myAlarm;
 	}
 	
 	private NonExclusiveLimitAlarmType createNonExclusiveLimitAlarmNode(UaVariable source, UaObjectNode device, UaNode deviceSet) throws StatusException, UaInstantiationException {
