@@ -7,7 +7,9 @@ import java.util.Stack;
 
 import org.xml.sax.SAXException;
 
+import com.prosysopc.ua.stack.builtintypes.ByteString;
 import com.prosysopc.ua.stack.builtintypes.DataValue;
+import com.prosysopc.ua.stack.builtintypes.DateTime;
 import com.prosysopc.ua.stack.builtintypes.ExpandedNodeId;
 import com.prosysopc.ua.stack.builtintypes.LocalizedText;
 import com.prosysopc.ua.stack.builtintypes.NodeId;
@@ -72,6 +74,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		TypeDefinitionBasedNodeBuilderConfiguration.Builder conf =TypeDefinitionBasedNodeBuilderConfiguration.builder();
 		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.TopologyElementType, UaQualifiedName.from("http://opcfoundation.org/UA/DI/", "ParameterSet")));
 		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.TopologyElementType, UaQualifiedName.from("http://opcfoundation.org/UA/DI/", "MethodSet")));
+		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.TopologyElementType, UaQualifiedName.from("http://opcfoundation.org/UA/DI/", "TriggerAlarm")));
 		this.setNodeBuilderConfiguration(conf.build());
 		
 		
@@ -146,7 +149,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    
 		    /**MethodManager init**/
 		    MethodManagerUaNode m = (MethodManagerUaNode) this.getMethodManager();	//Get method manager of this node manager
-		    m.addCallListener(new AppMethodManagerListener(client));						//Assign the listener to the method manager
+		    m.addCallListener(new AppMethodManagerListener(client, this));						//Assign the listener to the method manager
 		    
 			/**P300 Pressure sensor**/
 			UaNode P300 = getDevice(ns,"P300");
@@ -156,7 +159,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 			
 			
 			
-			this.getEventManager().setListener(new AppEventManagerListener());
+//			this.getEventManager().setListener(new AppEventManagerListener());
 			/*manually trigger an event*/
 			OffNormalAlarmTypeNode  ev = createEvent(OffNormalAlarmTypeNode.class);
 			ev.triggerEvent(null);
@@ -174,8 +177,17 @@ public class AppNodeManager extends NodeManagerUaNode {
 			L300_normal.setTypeDefinitionId(Identifiers.BaseDataVariableType);
 			L300_normal.setValue(false);
 			L300_normal.setDescription(new LocalizedText("L300_normal"));
-			
+			L300.addComponent(L300_normal);
 			OffNormalAlarmTypeNode alrm = createOffNormalAlarmNode(L300_measurement, L300, L300_normal_id, "L300: Boiler NOT FULL");
+			
+			UaNode methodSetNode = getMethodSet(ns, "L300");
+			
+			//Create and assign the method to MethodSet
+			NodeId methId = new NodeId(ns,"L300_TriggerAlarm");	//Unique NodeId for each method
+			UaMethodNode methNode= new UaMethodNode(this,methId,"TriggerAlarm",Locale.ENGLISH);//Instantiate node
+			methNode.setDescription(new LocalizedText("Method '"+"TriggerAlarm"+"'",Locale.ENGLISH));
+			
+			methodSetNode.addComponent(methNode);	//Attach the method to ddevice's MethodSet
 			
 			
 			/**M200 Pump**/
@@ -375,16 +387,21 @@ public class AppNodeManager extends NodeManagerUaNode {
 		myAlarm.setInput(source);
 //		myAlarm.setSourceNode(source.getNodeId());
 //		myAlarm.setInputNode(source.getNodeId());
+		myAlarm.setSeverity(500);
 		myAlarm.setEnabled(true);
+		myAlarm.setAcked(false);
+		myAlarm.setConfirmed(false);
+		myAlarm.setSuppressed(false);
 		myAlarm.setNormalState(normalState);
 		myAlarm.setSuppressedOrShelved(false);
 		myAlarm.setActiveState(new LocalizedText(message));
 
 		myAlarm.setMessage(new LocalizedText(message));
 		device.addComponent(myAlarm); // addReference(...Identifiers.HasComponent...)
-
+		myAlarm.addReference(source, Identifiers.HasEventSource, false);
 		source.addReference(myAlarm, Identifiers.HasCondition, false);
 		device.addReference(source, Identifiers.HasEventSource, false);
+		getDeviceSet().addReference(device, Identifiers.HasEventSource, false);
 		getServer().getNodeManagerRoot().getObjectsFolder().addReference(device, Identifiers.HasNotifier, false);
 
 		   return myAlarm;
@@ -399,11 +416,11 @@ public class AppNodeManager extends NodeManagerUaNode {
 		//these need to be added, but I dont know how to find LimitAlarmType
 //		conf.addOptional(UaBrowsePath.from(opc.ua.iec611313.Ids.LimitAlarmType, UaQualifiedName.standard("HighHighLimit")));
 ////		conf.addOptional(UaBrowsePath.from(opc.ua.iec611313.Ids., UaQualifiedName.standard("HighHighLimit")));
-//		conf.addOptional(UaBrowsePath.from(Ids.LimitAlarmType, UaQualifiedName.standard("HighLimit")));
-//		conf.addOptional(UaBrowsePath.from(Ids.LimitAlarmType, UaQualifiedName.standard("LowLimit")));
+//		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.LimitAlarmType, UaQualifiedName.standard("HighLimit")));
+//		conf.addOptional(UaBrowsePath.from(opc.ua.di.server.Ids.LimitAlarmType, UaQualifiedName.standard("LowLimit")));
 //		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.LimitAlarmType, UaQualifiedName.standard("LowLowLimit")));
 ////		conf.addOptional(UaBrowsePath.from(Ids.LimitAlarmType, UaQualifiedName.standard("LowLowLimit")));
-//		,
+
 		   this.setNodeBuilderConfiguration(conf.build());
 
 		   NonExclusiveLimitAlarmType myAlarm = createInstance(NonExclusiveLimitAlarmType.class, name, myAlarmId);
@@ -431,7 +448,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		   return myAlarm;
 	}
 
-	private UaVariable getVariable(int ns,String deviceName, String variableName) throws StatusException {
+	public UaVariable getVariable(int ns,String deviceName, String variableName) throws StatusException {
 		UaVariable var=null;	//The variable to return
 		NodeId deviceNodeId = new NodeId(ns,deviceName);	//Node Id formed only by the device's name
 		UaNode deviceNode = this.getNode(deviceNodeId);	//The device node that ownes the variable
@@ -465,4 +482,5 @@ public class AppNodeManager extends NodeManagerUaNode {
 		
 		return deviceNode;
 	}
+
 }

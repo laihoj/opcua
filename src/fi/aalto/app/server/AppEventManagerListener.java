@@ -7,6 +7,7 @@ import com.prosysopc.ua.server.EventManagerListener;
 import com.prosysopc.ua.server.MonitoredEventItem;
 import com.prosysopc.ua.server.ServiceContext;
 import com.prosysopc.ua.server.Subscription;
+import com.prosysopc.ua.server.UaServer;
 import com.prosysopc.ua.stack.builtintypes.ByteString;
 import com.prosysopc.ua.stack.builtintypes.DateTime;
 import com.prosysopc.ua.stack.builtintypes.LocalizedText;
@@ -16,10 +17,23 @@ import com.prosysopc.ua.stack.core.EventFilterResult;
 import com.prosysopc.ua.stack.core.StatusCodes;
 import com.prosysopc.ua.types.opcua.server.AcknowledgeableConditionTypeNode;
 import com.prosysopc.ua.types.opcua.server.AlarmConditionTypeNode;
+import com.prosysopc.ua.types.opcua.server.BaseEventTypeNode;
 import com.prosysopc.ua.types.opcua.server.ConditionTypeNode;
+import com.prosysopc.ua.types.opcua.server.OffNormalAlarmTypeNode;
 import com.prosysopc.ua.types.opcua.server.ShelvedStateMachineTypeNode;
 
 public class AppEventManagerListener implements EventManagerListener {
+
+	private UaServer server; 
+	private UaClient client; 
+	private AppNodeManager appNodeManager;
+	
+	public AppEventManagerListener(UaServer server, UaClient client, AppNodeManager appNodeManager) {
+		this.server = server;
+		this.client = client;
+		this.appNodeManager = appNodeManager;
+		
+	}
 	/**
 	   * Internal counter for UserEventId:s. Used from {@link #getNextUserEventId()}.
 	   */
@@ -89,6 +103,8 @@ public class AppEventManagerListener implements EventManagerListener {
 	  @Override
 	  public void onConditionRefresh(ServiceContext serviceContext, Subscription subscription) throws StatusException {
 	    //
+//		  OffNormalAlarmTypeNode  ev = appNodeManager.createEvent(OffNormalAlarmTypeNode.class);
+//		  ev.triggerEvent(null);
 	  }
 
 	  @Override
@@ -181,6 +197,7 @@ public class AppEventManagerListener implements EventManagerListener {
 	  public void onModifyMonitoredEventItem(ServiceContext serviceContext, Subscription subscription,
 	      MonitoredEventItem monitoredItem, EventFilter eventFilter, EventFilterResult filterResult)
 	      throws StatusException {
+		  System.out.println("monitored event item modified");
 	    // Modify event monitoring, when the client modifies a monitored
 	    // item
 	  }
@@ -209,5 +226,21 @@ public class AppEventManagerListener implements EventManagerListener {
 
 	  ByteString getNextUserEventId() throws RuntimeException {
 	    return EventManager.createEventId(eventId++);
+	  }
+	  
+	  /**
+	   * Send an event notification.
+	   *
+	   * @param event The event to trigger.
+	   */
+	  private void triggerEvent(BaseEventTypeNode event) {
+		  // Trigger event
+		  final DateTime now = DateTime.currentTime();
+		  // Use your own EventId to keep track of your events, if you need to (for example when alarms
+		  // are acknowledged)
+		  ByteString myEventId = getNextUserEventId();
+		  // If you wish, you can record the full event ID that is provided by triggerEvent, although your
+		  // own 'myEventId' is usually enough to keep track of the event.
+		  /* ByteString fullEventId = */event.triggerEvent(now, now, myEventId);
 	  }
 }

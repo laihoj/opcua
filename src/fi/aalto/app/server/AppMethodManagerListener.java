@@ -9,19 +9,23 @@ import com.prosysopc.ua.nodes.UaVariable;
 import com.prosysopc.ua.server.CallableListener;
 import com.prosysopc.ua.server.NodeManager;
 import com.prosysopc.ua.server.ServiceContext;
+import com.prosysopc.ua.server.UaServer;
 import com.prosysopc.ua.server.UaServer.NodeManagerUaServer;
 import com.prosysopc.ua.stack.builtintypes.DiagnosticInfo;
 import com.prosysopc.ua.stack.builtintypes.NodeId;
 import com.prosysopc.ua.stack.builtintypes.StatusCode;
 import com.prosysopc.ua.stack.builtintypes.Variant;
+import com.prosysopc.ua.types.opcua.server.OffNormalAlarmTypeNode;
 
 public class AppMethodManagerListener implements CallableListener {	
 
 	private UaClient client; //client used to write variables on DemoServer
+	private AppNodeManager appNodeManager;
 	
-    public AppMethodManagerListener(UaClient clt) {
+    public AppMethodManagerListener(UaClient clt, AppNodeManager appNodeManager) {
     	super();
     	client=clt;
+    	this.appNodeManager = appNodeManager;
     }
 
     /**
@@ -70,6 +74,13 @@ public class AppMethodManagerListener implements CallableListener {
 				//Set DemoServer's variable to MANUAL. AppServer's one will be updated by IoManager
 				client.writeValue(varId, "MANUAL");
 				//System.out.println("varNode set to 'MANUAL'");
+			}else if(names[1].contains("TriggerAlarm")){
+				System.out.println("alarm triggered");
+				OffNormalAlarmTypeNode  ev = appNodeManager.createEvent(OffNormalAlarmTypeNode.class);
+				ev.triggerEvent(null);
+				UaVariable L300_measurement = appNodeManager.getVariable(2,"L300","MeasVal");
+				client.writeValue(L300_measurement.getNodeId(), true);
+
 			}else {
 				//Invalid method name
 				//System.out.println("invalid method called");
