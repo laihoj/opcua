@@ -141,7 +141,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    
 		    /**MethodManager init**/
 		    MethodManagerUaNode m = (MethodManagerUaNode) this.getMethodManager();	//Get method manager of this node manager
-		    m.addCallListener(new AppMethodManagerListener());						//Assign the listener to the method manager
+		    m.addCallListener(new AppMethodManagerListener(client));						//Assign the listener to the method manager
 		    
 			/**P300 Pressure sensor**/
 			UaNode P300 = getDevice(ns,"P300");

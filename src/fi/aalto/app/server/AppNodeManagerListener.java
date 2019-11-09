@@ -3,6 +3,7 @@ package fi.aalto.app.server;
 import java.util.List;
 
 import com.prosysopc.ua.stack.builtintypes.NodeId;
+import com.prosysopc.ua.stack.builtintypes.DataValue;
 import com.prosysopc.ua.stack.builtintypes.ExpandedNodeId;
 import com.prosysopc.ua.stack.core.UserTokenType;
 import com.prosysopc.ua.stack.core.StatusCodes;
@@ -19,6 +20,8 @@ import com.prosysopc.ua.server.NodeManagerListener;
 import com.prosysopc.ua.server.ServiceContext;
 import com.prosysopc.ua.nodes.UaNode;
 import com.prosysopc.ua.nodes.UaReferenceType;
+import com.prosysopc.ua.nodes.UaVariable;
+import com.prosysopc.ua.ServiceException;
 import com.prosysopc.ua.StatusException;
 import com.prosysopc.ua.client.UaClient;
 import com.prosysopc.ua.server.Subscription;
@@ -72,6 +75,7 @@ public class AppNodeManagerListener implements NodeManagerListener {
 	public boolean onBrowseNode(ServiceContext serviceContext,
 			ViewDescription view, NodeId nodeId, UaNode node,
 			UaReference reference) {
+		//System.out.println("onBrowseNode");
 		return true;
 	}
 
@@ -124,6 +128,7 @@ public class AppNodeManagerListener implements NodeManagerListener {
 			UnsignedInteger attributeId, NumericRange indexRange,
 			MonitoringParameters params, MonitoringFilter filter,
 			AggregateFilterResult filterResult, MonitoringMode monitoringMode) throws StatusException {
+		//System.out.println("onCreateMonitoredDataItem");
 	}
 
 	@Override
@@ -141,17 +146,19 @@ public class AppNodeManagerListener implements NodeManagerListener {
 		    System.out.println(e.getMessage());
 	    }
 	}
-
+	
 	@Override
 	public void onModifyMonitoredDataItem(ServiceContext serviceContext,
 			Subscription subscription, MonitoredDataItem item, UaNode node,
 			MonitoringParameters params, MonitoringFilter filter,
 			AggregateFilterResult filterResult) {
+		//System.out.println("onModifyMonitoredDataItem");
 	}
 
 	@Override
 	public void onAfterModifyMonitoredDataItem(ServiceContext serviceContext,
 			Subscription subscription, MonitoredDataItem item) {
+		//System.out.println("onAfterModifyMonitoredDataItem");
 	}
 
 	@Override

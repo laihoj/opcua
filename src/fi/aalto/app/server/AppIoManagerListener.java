@@ -64,14 +64,14 @@ public class AppIoManagerListener implements IoManagerListener {
 
 		int sourceNs = 2; // TODO get sourceNs from client?
 		try {
-            DataValue sourceValue = client.readValue(new NodeId(sourceNs, node.getDisplayName().getText()));
+            DataValue sourceValue = client.readValue(node.getNodeId());
 			dataValue.setSourceTimestamp(sourceValue.getSourceTimestamp());
 			dataValue.setValue(sourceValue.getValue());
 			dataValue.setStatusCode(StatusCode.GOOD);
 			node.setValue(dataValue);
 			return true;
 		} catch (Exception e) {
-		    System.out.println(e.getMessage());
+		    System.out.println("AppIoManagerListener onReadValue : "+e.getMessage());
 		}
 		
 		return false;
@@ -91,11 +91,11 @@ public class AppIoManagerListener implements IoManagerListener {
 
 		int sourceNs = 2; // TODO get sourceNs from client?
 		try {
-		    client.writeValue(new NodeId(sourceNs, node.getDisplayName().getText()), dataValue);
+		    client.writeValue(node.getNodeId(), dataValue);
 			node.setValue(dataValue);
 		    return true;
 		} catch (Exception e) {
-		    System.out.println(e.getMessage());
+		    System.out.println("AppIoManagerListener onWriteValue : "+e.getMessage());
 		}
 
 		return false;

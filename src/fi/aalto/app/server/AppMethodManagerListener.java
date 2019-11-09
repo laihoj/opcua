@@ -2,6 +2,7 @@ package fi.aalto.app.server;
 
 import com.prosysopc.ua.StatusException;
 import com.prosysopc.ua.UaException;
+import com.prosysopc.ua.client.UaClient;
 import com.prosysopc.ua.nodes.UaMethod;
 import com.prosysopc.ua.nodes.UaNode;
 import com.prosysopc.ua.nodes.UaVariable;
@@ -16,8 +17,11 @@ import com.prosysopc.ua.stack.builtintypes.Variant;
 
 public class AppMethodManagerListener implements CallableListener {	
 
-    public AppMethodManagerListener() {
-            super();
+	private UaClient client; //client used to write variables on DemoServer
+	
+    public AppMethodManagerListener(UaClient clt) {
+    	super();
+    	client=clt;
     }
 
     /**
@@ -55,15 +59,16 @@ public class AppMethodManagerListener implements CallableListener {
 		
 		try {
 			UaVariable varNode = (UaVariable)object.getAddressSpace().getNode(varId);
+			
 			//System.out.println("varNode BrowseName='"+varNode.getBrowseName()+"'");
 			if(names[1].contains("SetModeAuto")) {
-				//Set the variable to AUTO
-				varNode.setValue("AUTO");
+				//Set DemoServer's variable to AUTO. AppServer's one will be updated by IoManager
+				client.writeValue(varId, "AUTO");
 				//System.out.println("varNode set to 'AUTO'");
 			}
 			else if(names[1].contains("SetModeMan")){
-				//Set the variable to MAN
-				varNode.setValue("MAN");
+				//Set DemoServer's variable to MAN. AppServer's one will be updated by IoManager
+				client.writeValue(varId, "MAN");
 				//System.out.println("varNode set to 'MAN'");
 			}else {
 				//Invalid method name

@@ -30,5 +30,4 @@ public class AppMonitoredDataItemListener implements MonitoredDataItemListener {
 		    System.out.println(e.getMessage());
 	    }
 	}
-
 }
