@@ -67,9 +67,9 @@ public class AppMethodManagerListener implements CallableListener {
 				//System.out.println("varNode set to 'AUTO'");
 			}
 			else if(names[1].contains("SetModeMan")){
-				//Set DemoServer's variable to MAN. AppServer's one will be updated by IoManager
-				client.writeValue(varId, "MAN");
-				//System.out.println("varNode set to 'MAN'");
+				//Set DemoServer's variable to MANUAL. AppServer's one will be updated by IoManager
+				client.writeValue(varId, "MANUAL");
+				//System.out.println("varNode set to 'MANUAL'");
 			}else {
 				//Invalid method name
 				//System.out.println("invalid method called");
