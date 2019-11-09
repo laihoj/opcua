@@ -7,6 +7,7 @@ import java.util.Stack;
 
 import org.xml.sax.SAXException;
 
+import com.prosysopc.ua.stack.builtintypes.DataValue;
 import com.prosysopc.ua.stack.builtintypes.ExpandedNodeId;
 import com.prosysopc.ua.stack.builtintypes.LocalizedText;
 import com.prosysopc.ua.stack.builtintypes.NodeId;
@@ -14,6 +15,7 @@ import com.prosysopc.ua.stack.builtintypes.QualifiedName;
 import com.prosysopc.ua.stack.common.NamespaceTable;
 import com.prosysopc.ua.stack.common.ServiceResultException;
 import com.prosysopc.ua.stack.core.Identifiers;
+import com.prosysopc.ua.stack.core.NodeAttributes;
 import com.prosysopc.ua.stack.core.BrowseDescription;
 import com.prosysopc.ua.stack.core.BrowseDirection;
 import com.prosysopc.ua.stack.core.BrowseResult;
@@ -24,6 +26,7 @@ import com.prosysopc.ua.types.opcua.NonExclusiveLimitAlarmType;
 
 import fi.aalto.app.AppDeviceType;
 import fi.aalto.app.Ids;
+import jdk.internal.org.objectweb.asm.tree.MethodNode;
 import opc.ua.di.TopologyElementType;
 import opc.ua.di.UIElementType;
 import opc.ua.di.client.UIElementTypeImpl;
@@ -39,9 +42,11 @@ import com.prosysopc.ua.nodes.UaObjectType;
 import com.prosysopc.ua.nodes.UaReference;
 import com.prosysopc.ua.nodes.UaType;
 import com.prosysopc.ua.server.EventManagerListener;
+import com.prosysopc.ua.server.MethodManagerUaNode;
 import com.prosysopc.ua.server.NodeManager;
 import com.prosysopc.ua.server.NodeManagerUaNode;
 import com.prosysopc.ua.server.UaInstantiationException;
+import com.prosysopc.ua.server.UaNodeUtils;
 import com.prosysopc.ua.server.UaServer;
 import com.prosysopc.ua.server.UaServer.NodeManagerUaServer;
 import com.prosysopc.ua.server.instantiation.TypeDefinitionBasedNodeBuilderConfiguration;
@@ -51,6 +56,7 @@ import com.prosysopc.ua.server.nodes.UaObjectNode;
 import com.prosysopc.ua.server.nodes.UaObjectTypeNode;
 import com.prosysopc.ua.client.AddressSpace;
 import com.prosysopc.ua.client.UaClient;
+import com.prosysopc.ua.client.nodes.UaMethodImpl;
 
 public class AppNodeManager extends NodeManagerUaNode {
 
@@ -131,11 +137,11 @@ public class AppNodeManager extends NodeManagerUaNode {
 		        	//release 1.01. You have to utilize the DeviceType type.
 		        	assignOtherVar(ns, (UaVariable)var);
 		        }
-		        
-		        //Following lines were here to create variable
-		        //NodeId dataTypeId = var.getDataTypeId();
-		        //createVariable(ns, name, dataTypeId, parent);
 		    }
+		    
+		    /**MethodManager init**/
+		    MethodManagerUaNode m = (MethodManagerUaNode) this.getMethodManager();	//Get method manager of this node manager
+		    m.addCallListener(new AppMethodManagerListener());						//Assign the listener to the method manager
 		    
 			/**P300 Pressure sensor**/
 			UaNode P300 = getDevice(ns,"P300");
@@ -187,8 +193,6 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    for(int i=0;i<stackSize;i++) {
 		    	System.out.println("Stack["+i+"]: '"+e.getStackTrace()[i].getMethodName()+"' at line '"+e.getStackTrace()[i].getLineNumber()+"'");
 		    }
-		    
-
 	    }
 	}
 	
@@ -237,8 +241,8 @@ public class AppNodeManager extends NodeManagerUaNode {
 		int deviceNumber=deviceNames.length;
 		for(int i=0;i<deviceNumber;i++) {
 			NodeId deviceId = new NodeId(ns, deviceNames[i]);	//Generate device's nodeId
-			NodeId paramSetId= new NodeId(ns,deviceNames[i]+TopologyElementType.PARAMETER_SET); //Generate device ParameterSet's nodeId
-			NodeId methodSetId= new NodeId(ns,deviceNames[i]+TopologyElementType.METHOD_SET); //Generate device MethodSet's nodeId
+			NodeId paramSetId= new NodeId(ns,deviceNames[i]+"_"+TopologyElementType.PARAMETER_SET); //Generate device ParameterSet's nodeId
+			NodeId methodSetId= new NodeId(ns,deviceNames[i]+"_"+TopologyElementType.METHOD_SET); //Generate device MethodSet's nodeId
 			
 			//Device node
 			deviceNode = new UaObjectNode(this,deviceId,deviceNames[i],Locale.ENGLISH);	//Instantiate node
@@ -249,13 +253,13 @@ public class AppNodeManager extends NodeManagerUaNode {
 			//ParameterSet node
 			componentNode = new UaObjectNode(this,paramSetId,TopologyElementType.PARAMETER_SET,Locale.ENGLISH);	//Instantiate node
 			componentNode.setTypeDefinitionId(Identifiers.BaseObjectType);										//Set node's type
-			componentNode.setDescription(new LocalizedText("ParameterSet of "+deviceNames[i])); 				//Set node's description
+			componentNode.setDescription(new LocalizedText("ParameterSet of "+deviceNames[i],Locale.ENGLISH)); 	//Set node's description
 			deviceNode.addComponent(componentNode);																//Attach the component to its device
 
 			//MethodSet node
 			componentNode = new UaObjectNode(this,methodSetId,TopologyElementType.METHOD_SET,Locale.ENGLISH);	//Instantiate node
 			componentNode.setTypeDefinitionId(Identifiers.BaseObjectType);										//Set node's type
-			componentNode.setDescription(new LocalizedText("MethodSet of "+deviceNames[i])); 					//Set node's description
+			componentNode.setDescription(new LocalizedText("MethodSet of "+deviceNames[i],Locale.ENGLISH)); 	//Set node's description
 			deviceNode.addComponent(componentNode);																//Attach the component to its device
 		}
 	}
@@ -269,7 +273,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		UaNode paramSetNode = getParameterSet(ns, names[0]);
 		
 		//Create and assign the variable to ParameterSet
-		NodeId varId = new NodeId(ns,names[0]+"|"+names[1]);	//Unique NodeId for each var
+		NodeId varId = new NodeId(ns,names[0]+"_"+names[1]);	//Unique NodeId for each var
 		createVariable(ns,names[1],varId,nodeToAssign.getValue().getValue(),nodeToAssign.getDataTypeId(),paramSetNode);
 	}
 	
@@ -281,9 +285,10 @@ public class AppNodeManager extends NodeManagerUaNode {
 		UaNode methodSetNode = getMethodSet(ns, names[0]);
 		
 		//Create and assign the method to MethodSet
-		NodeId methId = new NodeId(ns,names[0]+"|"+names[1]);	//Unique NodeId for each method
+		NodeId methId = new NodeId(ns,names[0]+"_"+names[1]);	//Unique NodeId for each method
 		UaMethodNode methNode= new UaMethodNode(this,methId,names[1],Locale.ENGLISH);//Instantiate node
-		//TODO: finish the method's attributes
+		methNode.setDescription(new LocalizedText("Method '"+names[1]+"'",Locale.ENGLISH));
+		
 		methodSetNode.addComponent(methNode);	//Attach the method to ddevice's MethodSet
 	}
 	

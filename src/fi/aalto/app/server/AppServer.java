@@ -130,7 +130,7 @@ public class AppServer {
 	protected void waitForEnter() {
 		try {
 		    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-            System.out.print("AppServer: Press enter to exit");
+            System.out.println("AppServer: Press enter to exit");
             String s = br.readLine();
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
