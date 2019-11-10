@@ -103,7 +103,6 @@ public class AppServer {
 			appNodeManager.createAddressSpace(appClient.getClient());
 			appNodeManager.getIoManager().addListeners(new AppIoManagerListener(appClient.getClient()));
 			appNodeManager.addListener(new AppNodeManagerListener(appClient.getClient(), this.server));
-			appNodeManager.getEventManager().setListener(new AppEventManagerListener(this.server, appClient.getClient(), appNodeManager));
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
 			return;

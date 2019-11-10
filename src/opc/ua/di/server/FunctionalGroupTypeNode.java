@@ -17,7 +17,7 @@ import java.lang.Override;
  */
 @TypeDefinitionId("nsu=http://opcfoundation.org/UA/DI/;i=1005")
 public class FunctionalGroupTypeNode extends FunctionalGroupTypeNodeBase {
-  protected FunctionalGroupTypeNode(NodeManagerUaNode nodeManager, NodeId nodeId,
+  public FunctionalGroupTypeNode(NodeManagerUaNode nodeManager, NodeId nodeId,
       QualifiedName browseName, LocalizedText displayName) {
     super(nodeManager, nodeId, browseName, displayName);
   }

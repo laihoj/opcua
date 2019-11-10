@@ -7,9 +7,7 @@ import java.util.Stack;
 
 import org.xml.sax.SAXException;
 
-import com.prosysopc.ua.stack.builtintypes.ByteString;
 import com.prosysopc.ua.stack.builtintypes.DataValue;
-import com.prosysopc.ua.stack.builtintypes.DateTime;
 import com.prosysopc.ua.stack.builtintypes.ExpandedNodeId;
 import com.prosysopc.ua.stack.builtintypes.LocalizedText;
 import com.prosysopc.ua.stack.builtintypes.NodeId;
@@ -35,12 +33,14 @@ import fi.aalto.app.Ids;
 import opc.ua.di.TopologyElementType;
 import opc.ua.di.UIElementType;
 import opc.ua.di.client.UIElementTypeImpl;
+import opc.ua.di.server.FunctionalGroupTypeNode;
 
 import com.prosysopc.ua.nodes.UaVariable;
 import com.prosysopc.ua.ModelException;
 import com.prosysopc.ua.StatusException;
 import com.prosysopc.ua.UaBrowsePath;
 import com.prosysopc.ua.UaQualifiedName;
+import com.prosysopc.ua.nodes.UaMethod;
 import com.prosysopc.ua.nodes.UaNode;
 import com.prosysopc.ua.nodes.UaNodeFactoryException;
 import com.prosysopc.ua.nodes.UaObjectType;
@@ -84,7 +84,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		
 		AddressSpace sourceAddressSpace = client.getAddressSpace();
 		final UaNode deviceSet;
-		String[] deviceNames= {"L300","L301","M200","P300","T300","Y301","Y303","Y501"};	//Devices list
+		String[] deviceNames= {"L300","L301","M200","P300","PIC300","T300","Y301","Y303","Y501"};	//Devices list
 
 		int ns = getNamespaceIndex();
 		final UaNode objectsFolder = getServer().getNodeManagerRoot().getObjectsFolder();
@@ -120,52 +120,77 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    	UaNode var = sourceAddressSpace.getNode(ref.getNodeId(), UaNode.class);	//Get node from DemoServer
 		        String name = var.getBrowseName().getName();	//Get node's browse name
 		        
-		        if(name.startsWith("PIC300_")) {
-		        	//The data about the tag PIC300 should follow the OPC UA Information Model for IEC 61131.3,
-		        	//release 1.00. You can utilize the CtrlConfigurationType type.
-		        	
-		        	//TODO maybe hardcode (see above)
-		        	
-		        }
-		        else if(name.contains("SetMode")) {
+		        if(name.contains("SetMode")) {
 		        	//The variables whose name contain SetModeAuto or SetModeMan should be provided as 
 		        	//OPC UA methods according to the OPC UA Specification, 
 		        	//Part 3: Address Space Model, release 1.04.
-		        	
+		        	//PIC300 methods are also managed here
 		        	assignMethod(ns,var);
 		        }
 		        else if(name.contains("AlrmEvt")) {
 		        	//The variables who have the nature of alarms should be provided only as OPC UA alarms (and not as variables) 
 		        	//according to the OPC UA Specification Part 9: Alarms & Conditions, release 1.04.
 		        	
-		        	//TODO : maybe hardcode (see above)
+		        	//TODO : maybe hardcode needed (see below)
 		        }
 		        else {
 		        	//The data about all other tags should follow the OPC UA for Devices Companion Specification, 
 		        	//release 1.01. You have to utilize the DeviceType type.
+		        	//PIC300 variables are also managed here
 		        	assignOtherVar(ns, (UaVariable)var);
 		        }
 		    }
 		    
 		    /**MethodManager init**/
 		    MethodManagerUaNode m = (MethodManagerUaNode) this.getMethodManager();	//Get method manager of this node manager
-		    m.addCallListener(new AppMethodManagerListener(client, this));						//Assign the listener to the method manager
+		    m.addCallListener(new AppMethodManagerListener(client));				//Assign the listener to the method manager
 		    
+			/**PIC300 components organisation**/
+		    //The data about the tag PIC300 should follow the OPC UA Information Model for IEC 61131.3, release 1.00.
+		    //You can utilize the CtrlConfigurationType type.
+		    
+		    UaNode deviceNode=getDevice(ns,"PIC300");	//Get device node
+		    
+		    //GlobalVars functional group
+		    NodeId FuncGrpId = new NodeId(ns,"PIC300_GlobalVars");	//Id to identify the functional group
+		    FunctionalGroupTypeNode FuncGrpNode = new FunctionalGroupTypeNode(this, FuncGrpId,
+		    		new QualifiedName("GlobalVars"), new LocalizedText("GlobalVars"));	//Functional group node
+		    FuncGrpNode.setDescription(new LocalizedText("Global components involved in PID process",Locale.ENGLISH));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","CtrlOff"));	//Assign components to the group they belong to
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","CtrlOn"));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","CtrlVal"));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","CurModeVal"));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","CurSPVal"));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","Enable"));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","Kp"));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","ManCtrlVal"));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","PIDReset"));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","SPVal"));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","Td"));
+		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","Ti"));
+		    deviceNode.addComponent(FuncGrpNode);	//Attach the group to the device
+		    
+		    //Configuration functional group
+		    FuncGrpId = new NodeId(ns,"PIC300_Configuration");	//Id to identify the functional group
+		    FuncGrpNode = new FunctionalGroupTypeNode(this, FuncGrpId,
+		    		new QualifiedName("Configuration"), new LocalizedText("Configuration"));	//Functional group node
+		    FuncGrpNode.setDescription(new LocalizedText("Configuration components involved in PID process",Locale.ENGLISH));
+		    FuncGrpNode.addComponent(getMethod(ns,"PIC300","SetModeAuto"));	//Assign components to the group they belong to
+		    FuncGrpNode.addComponent(getMethod(ns,"PIC300","SetModeMan"));
+		    deviceNode.addComponent(FuncGrpNode);	//Attach the group to the device
+		    
+		    /**Alarms configuration**/
+		    this.getEventManager().setListener(new AppEventManagerListener());	//Alarm events manager
 			/**P300 Pressure sensor**/
 			UaNode P300 = getDevice(ns,"P300");
 			UaNode parameterSet = getParameterSet(ns,"P300");
 			UaVariable P300_measurement = getVariable(ns,"P300","ZeroMeas");
 			createNonExclusiveLimitAlarmNode(P300_measurement , (UaObjectNode) P300, parameterSet).setMessage(new LocalizedText("P300: (L) Boiler pressure at 0.0bar(g)"));
 			
-			
-			
-//			this.getEventManager().setListener(new AppEventManagerListener());
 			/*manually trigger an event*/
-			OffNormalAlarmTypeNode  ev = createEvent(OffNormalAlarmTypeNode.class);
-			ev.triggerEvent(null);
+			//OffNormalAlarmTypeNode  ev = createEvent(OffNormalAlarmTypeNode.class);
+			//ev.triggerEvent(null);
 
-
-			
 			/**L300 High level alarm**/
 			UaNode L300 = getDevice(ns, "L300");
 			UaVariable L300_measurement = getVariable(ns,"L300","MeasVal");
@@ -460,7 +485,19 @@ public class AppNodeManager extends NodeManagerUaNode {
 		return var;
 	}
 	
-	private UaNode getParameterSet(int ns,String deviceName) throws StatusException {
+	public UaMethod getMethod(int ns,String deviceName, String methodName) throws StatusException {
+		UaMethod meth=null;	//The method to return
+		NodeId deviceNodeId = new NodeId(ns,deviceName);	//Node Id formed only by the device's name
+		UaNode deviceNode = this.getNode(deviceNodeId);	//The device node that ownes the method
+		UaNode methodSetNode = deviceNode.getComponent(new QualifiedName(ns,TopologyElementType.METHOD_SET));	//The methodSet node
+		
+		//Browse name composed of namespace index + method name
+		meth= (UaMethod) methodSetNode.getComponent(new QualifiedName(ns, methodName));
+		
+		return meth;
+	}																							 
+	
+	public UaNode getParameterSet(int ns,String deviceName) throws StatusException {
 		NodeId deviceNodeId = new NodeId(ns,deviceName);	//Node Id formed only by the device's name
 		UaNode deviceNode = this.getNode(deviceNodeId);	//The device node that ownes the variable
 		UaNode parameterSetNode = deviceNode.getComponent(new QualifiedName(ns,TopologyElementType.PARAMETER_SET));	//The parameterSet node
@@ -468,7 +505,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		return parameterSetNode;
 	}
 	
-	private UaNode getMethodSet(int ns,String deviceName) throws StatusException {
+	public UaNode getMethodSet(int ns,String deviceName) throws StatusException {
 		NodeId deviceNodeId = new NodeId(ns,deviceName);	//Node Id formed only by the device's name
 		UaNode deviceNode = this.getNode(deviceNodeId);	//The device node that ownes the variable
 		UaNode methodSetNode = deviceNode.getComponent(new QualifiedName(ns,TopologyElementType.METHOD_SET));	//The methodSet node
@@ -476,7 +513,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		return methodSetNode;
 	}
 	
-	private UaNode getDevice(int ns,String deviceName) throws StatusException {
+	public UaNode getDevice(int ns,String deviceName) throws StatusException {
 		NodeId deviceNodeId = new NodeId(ns,deviceName);	//Node Id formed only by the device's name
 		UaNode deviceNode = this.getNode(deviceNodeId);	//The device node that ownes the variable
 		
