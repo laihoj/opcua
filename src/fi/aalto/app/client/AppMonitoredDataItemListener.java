@@ -5,15 +5,18 @@ import com.prosysopc.ua.stack.builtintypes.DataValue;
 import com.prosysopc.ua.stack.builtintypes.DateTime;
 import com.prosysopc.ua.stack.builtintypes.NodeId;
 import com.prosysopc.ua.stack.builtintypes.QualifiedName;
+import com.prosysopc.ua.stack.builtintypes.Variant;
 import com.prosysopc.ua.stack.core.Identifiers;
 import com.prosysopc.ua.stack.core.ReferenceDescription;
 import com.prosysopc.ua.typedictionary.FieldSpecification;
+import com.prosysopc.ua.types.opcua.server.AlarmConditionTypeNode;
 import com.prosysopc.ua.types.opcua.server.BaseEventTypeNode;
 import com.prosysopc.ua.client.MonitoredDataItemListener;
 import com.prosysopc.ua.client.MonitoredDataItem;
 import com.prosysopc.ua.server.EventManager;
 import com.prosysopc.ua.server.UaServer;
 import com.prosysopc.ua.nodes.UaNode;
+import com.prosysopc.ua.nodes.UaProperty;
 import com.prosysopc.ua.nodes.UaReference;
 import com.prosysopc.ua.nodes.UaVariable;
 
@@ -27,59 +30,44 @@ public class AppMonitoredDataItemListener implements MonitoredDataItemListener {
 	
 	@Override
 	public void onDataChange(MonitoredDataItem sender, DataValue prevValue, DataValue value) {
-		// TODO
 		try {
 		    String name = sender.getNodeId().getValue().toString();
-//		    sender.get
 		    //System.out.println("onDataChange: " + name + " " + value.getValue().getValue());
-		    //int ns = this.server.getNodeManagerRoot().getNamespaceIndex();
+		    /**Update corresponding AppServer's value**/
 		    int ns = 2;
 		    UaVariable node = (UaVariable)this.server.getNodeManagerRoot().getNode(new NodeId(ns, name));
 		    node.setValue(value);
 		    
-		    //checking for alarm triggers
+		    /**Checking for alarm triggers**/
 		    UaReference ref = node.getReference(Identifiers.HasCondition, false);
-		    BaseEventTypeNode alarm = (BaseEventTypeNode) ref.getTargetNode(); //alarm
-		    if (alarm.getReference(Identifiers.HasTypeDefinition, false).getTargetNode().getNodeId().equals(Identifiers.OffNormalAlarmType)) {
-//		    	System.out.println("OffNormalAlarmType");
-//		    	System.out.println();
-			    
-			    UaNode normalstateproperty = alarm.getProperty(new QualifiedName("NormalState"));
-			    System.out.println(normalstateproperty);
-			    
-			    /*
-			     * TODO: find the normal state value from the alarm, 
-			     * and compare that to the value of the monitoreddataitem value.
-			     * If value is different, triggerEvent(alarm); and done
-			     * */
-			    
-//			    System.out.println(normalstateproperty.getAddressSpace().get);
-//			    System.out.println(normalstateproperty.getBrowseName());
-//			    System.out.println(normalstateproperty.getDisplayName());
-//			    System.out.println(normalstateproperty.getComponents());
-//			    System.out.println(normalstateproperty.get);
-//			    server.getAddressSpace().getNode(normalstateproperty.getDisplayName());
-//			    UaNode normalState = server.getAddressSpace().getNode(normalstateproperty.);
-//			    System.out.println(normalState);
-//			    normalState.get
-		    	
-//		    	TODO: Logic to check if alarm needs to trigger
-//		    	triggerEvent(alarm);
-		    	
-		    }
+		    if(ref==null) return;	//null -> This data is not linked to any alarm, no need to go further
+		    System.out.println("onDataChange : an alarm-linked variable has changed");
+		    AlarmConditionTypeNode alarm = (AlarmConditionTypeNode) ref.getTargetNode(); //alarm
 		    
-		    if (alarm.getReference(Identifiers.HasTypeDefinition, false).getTargetNode().getNodeId().equals(Identifiers.NonExclusiveLimitAlarmType)) {
-//		    	System.out.println("NonExclusiveLimitAlarmType");
+		    if (alarm.getTypeDefinition().getNodeId().equals(Identifiers.OffNormalAlarmType)) {
+		    	System.out.println("onDataChange : OffNormalAlarmType");
+			    
+		    	/*VERY complicated way to get the normalStateValue....*/
+			    UaProperty normalStateProperty = alarm.getProperty(new QualifiedName("NormalState"));	//Get property (which stores "normal node"'s nodeId)
+			    NodeId normalStateNodeId = NodeId.parseNodeId(normalStateProperty.getValue().getValue().toString());	//Get "normal node"'s nodeId
+			    UaVariable normalStateNode = (UaVariable) server.getAddressSpace().getNode(normalStateNodeId);	//Get normal node
+			    Variant normalStateValue = normalStateNode.getValue().getValue();	//Finally get normal value
+
+			    if(!node.getValue().getValue().equals(normalStateValue)) {
+			    	//The variable is not in normal mode -> need to trigger the alarm
+			    	System.out.println("onDataChange : OffNormalAlarmType triggered");
+			    	System.out.println("(Normal value='"+normalStateValue+"', observed='"+node.getValue().getValue()+"')");
+			    	triggerEvent(alarm);
+			    }
+		    }
+		    else if (alarm.getTypeDefinition().getNodeId().equals(Identifiers.NonExclusiveLimitAlarmType)) {
+		    	System.out.println("onDataChange : NonExclusiveLimitAlarmType");
 		    	//TODO: Logic to check if alarm needs to trigger
 		    	/*
 			     * TODO: find the lowlow low high highhigh limits to compare against for triggering the alarm
 			     * */
-		    	triggerEvent(alarm);
+		    	//triggerEvent(alarm);
 		    }
-		    
-
-		    		
-		    
 		} catch (Exception e) {
 		    System.out.println(e.getMessage());
 	    }

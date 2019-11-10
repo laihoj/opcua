@@ -14,6 +14,7 @@ import com.prosysopc.ua.stack.builtintypes.LocalizedText;
 import com.prosysopc.ua.stack.builtintypes.NodeId;
 import com.prosysopc.ua.stack.core.EventFilter;
 import com.prosysopc.ua.stack.core.EventFilterResult;
+import com.prosysopc.ua.stack.core.MonitoringMode;
 import com.prosysopc.ua.stack.core.StatusCodes;
 import com.prosysopc.ua.types.opcua.server.AcknowledgeableConditionTypeNode;
 import com.prosysopc.ua.types.opcua.server.AlarmConditionTypeNode;
@@ -85,14 +86,19 @@ public class AppEventManagerListener implements EventManagerListener {
 	  @Override
 	  public void onAfterCreateMonitoredEventItem(ServiceContext serviceContext, Subscription subscription,
 	      MonitoredEventItem item) {
-//		  private Subscription subscription = new Subscription();
-		  System.out.println("monitored event item created");
-	    //
+		  System.out.println("Monitored event item created");	
+		  
+		  //Looks like there is a conflict between server and client libraries
+		  /*Subscription sub = new Subscription();
+		  MonitoredDataItem itemMonitored = new MonitoredDataItem(nodeId, attributeId, MonitoringMode.Reporting);
+		  sub.addItem(itemMonitored);
+		  client.addSubscription(sub);*/
 	  }
 
 	  @Override
 	  public void onAfterDeleteMonitoredEventItem(ServiceContext serviceContext, Subscription subscription,
 	      MonitoredEventItem item) {
+		  System.out.println("Monitored event item deleted");
 	    //
 	  }
 

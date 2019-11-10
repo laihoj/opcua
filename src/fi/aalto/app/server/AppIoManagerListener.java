@@ -69,6 +69,7 @@ public class AppIoManagerListener implements IoManagerListener {
 			dataValue.setValue(sourceValue.getValue());
 			dataValue.setStatusCode(StatusCode.GOOD);
 			node.setValue(dataValue);
+			//System.out.println("AppIoManagerListener onReadValue");
 			return true;
 		} catch (Exception e) {
 		    System.out.println("AppIoManagerListener onReadValue : "+e.getMessage());
@@ -88,7 +89,7 @@ public class AppIoManagerListener implements IoManagerListener {
 	public boolean onWriteValue(ServiceContext serviceContext, NodeId nodeId,
 			UaValueNode node, NumericRange indexRange, DataValue dataValue)
 			throws StatusException {	
-
+		//System.out.println("AppIoManagerListener onWriteValue");
 		int sourceNs = 2; // TODO get sourceNs from client?
 		try {
 		    client.writeValue(node.getNodeId(), dataValue);

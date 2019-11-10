@@ -37,6 +37,7 @@ import opc.ua.di.server.FunctionalGroupTypeNode;
 
 import com.prosysopc.ua.nodes.UaVariable;
 import com.prosysopc.ua.ModelException;
+import com.prosysopc.ua.ServiceException;
 import com.prosysopc.ua.StatusException;
 import com.prosysopc.ua.UaBrowsePath;
 import com.prosysopc.ua.UaQualifiedName;
@@ -98,7 +99,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		parent = createFolder(ns, "Application", parent);
 		parent = createFolder(ns, "GVL_WP_HPP", parent);*/
 		
-		int sourceNs = 2; // TODO get sourceNs from client?
+		int sourceNs = 2;
 		try {
 		    BrowseDescription browseDesc = new BrowseDescription();
 		    browseDesc.setNodeId(new NodeId(sourceNs, "GVL_WP_HPP"));
@@ -127,16 +128,10 @@ public class AppNodeManager extends NodeManagerUaNode {
 		        	//PIC300 methods are also managed here
 		        	assignMethod(ns,var);
 		        }
-		        else if(name.contains("AlrmEvt")) {
-		        	//The variables who have the nature of alarms should be provided only as OPC UA alarms (and not as variables) 
-		        	//according to the OPC UA Specification Part 9: Alarms & Conditions, release 1.04.
-		        	
-		        	//TODO : maybe hardcode needed (see below)
-		        }
-		        else {
+		        else if(!name.contains("AlrmEvt")){	//Condition to match other vars but Alarm related ones
 		        	//The data about all other tags should follow the OPC UA for Devices Companion Specification, 
 		        	//release 1.01. You have to utilize the DeviceType type.
-		        	//PIC300 variables are also managed here
+		        	//PIC300 variables are also processed here (first step)
 		        	assignOtherVar(ns, (UaVariable)var);
 		        }
 		    }
@@ -145,7 +140,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    MethodManagerUaNode m = (MethodManagerUaNode) this.getMethodManager();	//Get method manager of this node manager
 		    m.addCallListener(new AppMethodManagerListener(client, this));				//Assign the listener to the method manager
 		    
-			/**PIC300 components organisation**/
+			/**PIC300 components organisation (2nd step)**/
 		    //The data about the tag PIC300 should follow the OPC UA Information Model for IEC 61131.3, release 1.00.
 		    //You can utilize the CtrlConfigurationType type.
 		    
@@ -180,78 +175,36 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    deviceNode.addComponent(FuncGrpNode);	//Attach the group to the device
 		    
 		    /**Alarms configuration**/
-//		    this.getEventManager().setListener(new AppEventManagerListener());	//Alarm events manager
-			/**P300 Pressure sensor**/
+		    this.getEventManager().setListener(new AppEventManagerListener(getServer(),client,this));	//Alarm events manager
+			//L300 High level alarm
+			assignOffNormalAlarm(ns,"L300","MeasVal","AlrmEvtMsg",client);
+			
+			//L301 High level alarm
+			assignOffNormalAlarm(ns,"L301","MeasVal","AlrmEvtMsg",client);
+
+			//M200 Pump
+			assignOffNormalAlarm(ns,"M200","IntActive","AlrmEvtMsq",client);	//The 'q' of AlrmEvtMsq is not an error...
+			
+			//P300 Pressure sensor
 			UaNode P300 = getDevice(ns,"P300");
 			UaNode parameterSet = getParameterSet(ns,"P300");
 			UaVariable P300_measurement = getVariable(ns,"P300","ZeroMeas");
-			createNonExclusiveLimitAlarmNode(P300_measurement , (UaObjectNode) P300, parameterSet).setMessage(new LocalizedText("P300: (L) Boiler pressure at 0.0bar(g)"));
+			createNonExclusiveLimitAlarmNode(P300_measurement , (UaObjectNode)P300, parameterSet).setMessage(new LocalizedText("P300: (L) Boiler pressure at 0.0bar(g)"));
 			
-			/*manually trigger an event*/
-			//OffNormalAlarmTypeNode  ev = createEvent(OffNormalAlarmTypeNode.class);
-			//ev.triggerEvent(null);
+			//PIC300 Pump
+			assignOffNormalAlarm(ns,"PIC300","Enable","AlrmEvtMsq",client);
+			
+			//T300 Temperature sensor
+			
+			//Y301 Cut-off valve
+			assignOffNormalAlarm(ns,"Y301","CtrlVal","AlrmEvtMsq",client);
+			
+			//Y303 Cut-off valve
+			assignOffNormalAlarm(ns,"Y303","CtrlVal","AlrmEvtMsq",client);
+			
+			//Y501 Control valve
+			assignOffNormalAlarm(ns,"Y501","IntActive","AlrmEvtMsq",client);
 
-			/**L300 High level alarm**/
-			UaNode L300 = getDevice(ns, "L300");
-			UaVariable L300_measurement = getVariable(ns,"L300","MeasVal");
-			
-			NodeId L300_normal_id = new NodeId(ns,"L300_normal");	//Unique NodeId for each method
-			
-			UaVariable L300_normal = new PlainVariable<UaVariable>(this, L300_normal_id, "L300_normal", LocalizedText.NO_LOCALE);
-			L300_normal.setDataTypeId(L300_measurement.getDataTypeId());
-			L300_normal.setTypeDefinitionId(Identifiers.BaseDataVariableType);
-			L300_normal.setValue(false);
-			L300_normal.setDescription(new LocalizedText("L300_normal"));
-			L300_normal.setBrowseName(new QualifiedName("L300_normal"));
-			L300.addComponent(L300_normal);
-			OffNormalAlarmTypeNode alrm = createOffNormalAlarmNode(L300_measurement, L300, L300_normal_id, "L300: Boiler NOT FULL");
-			
-			UaNode methodSetNode = getMethodSet(ns, "L300");
-			
-			//Create and assign the method to MethodSet
-			NodeId methId = new NodeId(ns,"L300_TriggerAlarm");	//Unique NodeId for each method
-			UaMethodNode methNode= new UaMethodNode(this,methId,"TriggerAlarm",Locale.ENGLISH);//Instantiate node
-			methNode.setDescription(new LocalizedText("Method '"+"TriggerAlarm"+"'",Locale.ENGLISH));
-			
-			methodSetNode.addComponent(methNode);	//Attach the method to ddevice's MethodSet
-			
-			
-			/**M200 Pump**/
-			//TODO: OffNormalAlarmType
-//			createVariable(ns, "M200_AlrmEvtMsq", "M200: NORMAL", Identifiers.String, parent);
-//			createVariable(ns, "M200_AlrmEvtOn", false, Identifiers.Boolean, parent);
-			
-			/**Y301 and Y303 Cut-off valves**/
-			//TODO: OffNormalAlarmType
-//			createVariable(ns, "Y301_AlrmEvtMsq", "Y301: NORMAL", Identifiers.String, y301);
-//			createVariable(ns, "Y301_AlrmEvtOn", false, Identifiers.Boolean, y301);
-			
-			/**Y501 Control valve**/
-			//TODO: OffNormalAlarmType
-//			createVariable(ns, "Y501_AlrmEvtMsq", "Y501: NORMAL", Identifiers.String, y501);
-//			createVariable(ns, "Y501_AlrmEvtOn", false, Identifiers.Boolean, y501);
-			
-			/**PIC300 Pressure PID control**/
-			//TODO: CTRLCONFTYPE (perhaps we can automate it)
-//			createVariable(ns, "PIC300_AlrmEvtMsq", "PIC300: NORMAL", Identifiers.String, parent);
-//			createVariable(ns, "PIC300_AlrmEvtOn", false, Identifiers.Boolean, parent);
-//			createVariable(ns, "PIC300_CtrlOff", true, Identifiers.Boolean, parent);
-//			createVariable(ns, "PIC300_CtrlOn", false, Identifiers.Boolean, parent);
-//			createVariable(ns, "PIC300_CtrlVal", 0, Identifiers.Float, parent);
-//			createVariable(ns, "PIC300_CurModeVal", "MANUAL", Identifiers.String, parent);		
-//			createVariable(ns, "PIC300_CurSPVal", new Float(0), Identifiers.Float, parent);
-//			createVariable(ns, "PIC300_Enable", false, Identifiers.Boolean, parent);
-//			createVariable(ns, "PIC300_Kp", new Float(10), Identifiers.Float, parent);
-//			createVariable(ns, "PIC300_Td", new Float(1), Identifiers.Float, parent);
-//			createVariable(ns, "PIC300_Ti", new Float(0.1), Identifiers.Float, parent);
-//			createVariable(ns, "PIC300_ManCtrlVal", new Float(0), Identifiers.Float, parent);
-//			createVariable(ns, "PIC300_PIDReset", false, Identifiers.Boolean, parent);
-//			// SP2, SP2Active, SP3, SP3Active, SPSeq
-//			createVariable(ns, "PIC300_SPVal", new Float(0), Identifiers.Float, parent);
-//			createVariable(ns, "PIC300_SetModeAuto", false, Identifiers.Boolean, parent);
-//			createVariable(ns, "PIC300_SetModeMan", false, Identifiers.Boolean, parent);
-//			//createVariable(ns, "PIC300_SetModeSeq", false, Identifiers.Boolean, parent);
-		    
 		} catch (Exception e) {
 			System.out.println("\n/!\\ EXCEPTION /!\\");
 		    System.out.println("-->MESSAGE: "+e.getMessage());
@@ -329,6 +282,29 @@ public class AppNodeManager extends NodeManagerUaNode {
 			componentNode.setDescription(new LocalizedText("MethodSet of "+deviceNames[i],Locale.ENGLISH)); 	//Set node's description
 			deviceNode.addComponent(componentNode);																//Attach the component to its device
 		}
+	}
+	
+	private void assignOffNormalAlarm(int ns, String deviceName, String measurementVarName, String messageVarName, UaClient client) throws StatusException, ServiceException {
+		UaNode deviceNode = getDevice(ns,deviceName);	//Get device's node
+
+		UaVariable measurementVar=getVariable(ns,deviceName,measurementVarName);	//Get measurement node from AppServer
+		
+		NodeId messageVarId=new NodeId(ns,deviceName+"_"+messageVarName);
+		DataValue messageVal=client.readValue(messageVarId);	//Get msg value from DemoServer bc not copied in AppServer
+		
+		//Establish NormalSate Node in AppServer from trigger value in DemoServer
+		NodeId normalStateNodeId=new NodeId(ns,deviceName+"_normal");	//NormalStateNode in AppServer
+		NodeId triggerStateNodeId=new NodeId(ns,deviceName+"_AlrmEvtOn");//trigger value in DemoServer
+		
+		UaVariable normalStateNode=new PlainVariable<UaVariable>(this, normalStateNodeId, deviceName+"_normal", LocalizedText.NO_LOCALE);
+		normalStateNode.setDataTypeId(measurementVar.getDataTypeId());
+		normalStateNode.setTypeDefinitionId(Identifiers.BaseDataVariableType);
+		normalStateNode.setValue(!client.readValue(triggerStateNodeId).getValue().booleanValue());	//Get the inverse value (normal= !trigger)
+		normalStateNode.setDescription(new LocalizedText(deviceName+" normal state", Locale.ENGLISH));
+		normalStateNode.setBrowseName(new QualifiedName(deviceName+"_normal"));
+		deviceNode.addComponent(normalStateNode);
+
+		createOffNormalAlarmNode(measurementVar, deviceNode, normalStateNodeId,messageVal.getValue().toString());
 	}
 	
 	private void assignOtherVar(int ns, UaVariable nodeToAssign) throws StatusException {
