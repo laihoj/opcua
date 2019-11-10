@@ -143,7 +143,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    
 		    /**MethodManager init**/
 		    MethodManagerUaNode m = (MethodManagerUaNode) this.getMethodManager();	//Get method manager of this node manager
-		    m.addCallListener(new AppMethodManagerListener(client));				//Assign the listener to the method manager
+		    m.addCallListener(new AppMethodManagerListener(client, this));				//Assign the listener to the method manager
 		    
 			/**PIC300 components organisation**/
 		    //The data about the tag PIC300 should follow the OPC UA Information Model for IEC 61131.3, release 1.00.
@@ -180,7 +180,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    deviceNode.addComponent(FuncGrpNode);	//Attach the group to the device
 		    
 		    /**Alarms configuration**/
-		    this.getEventManager().setListener(new AppEventManagerListener());	//Alarm events manager
+//		    this.getEventManager().setListener(new AppEventManagerListener());	//Alarm events manager
 			/**P300 Pressure sensor**/
 			UaNode P300 = getDevice(ns,"P300");
 			UaNode parameterSet = getParameterSet(ns,"P300");
@@ -202,6 +202,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 			L300_normal.setTypeDefinitionId(Identifiers.BaseDataVariableType);
 			L300_normal.setValue(false);
 			L300_normal.setDescription(new LocalizedText("L300_normal"));
+			L300_normal.setBrowseName(new QualifiedName("L300_normal"));
 			L300.addComponent(L300_normal);
 			OffNormalAlarmTypeNode alrm = createOffNormalAlarmNode(L300_measurement, L300, L300_normal_id, "L300: Boiler NOT FULL");
 			

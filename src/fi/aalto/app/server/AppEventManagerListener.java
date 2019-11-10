@@ -85,6 +85,8 @@ public class AppEventManagerListener implements EventManagerListener {
 	  @Override
 	  public void onAfterCreateMonitoredEventItem(ServiceContext serviceContext, Subscription subscription,
 	      MonitoredEventItem item) {
+//		  private Subscription subscription = new Subscription();
+		  System.out.println("monitored event item created");
 	    //
 	  }
 
@@ -228,19 +230,19 @@ public class AppEventManagerListener implements EventManagerListener {
 	    return EventManager.createEventId(eventId++);
 	  }
 	  
-	  /**
-	   * Send an event notification.
-	   *
-	   * @param event The event to trigger.
-	   */
-	  private void triggerEvent(BaseEventTypeNode event) {
-		  // Trigger event
-		  final DateTime now = DateTime.currentTime();
-		  // Use your own EventId to keep track of your events, if you need to (for example when alarms
-		  // are acknowledged)
-		  ByteString myEventId = getNextUserEventId();
-		  // If you wish, you can record the full event ID that is provided by triggerEvent, although your
-		  // own 'myEventId' is usually enough to keep track of the event.
-		  /* ByteString fullEventId = */event.triggerEvent(now, now, myEventId);
-	  }
+//	  /**
+//	   * Send an event notification.
+//	   *
+//	   * @param event The event to trigger.
+//	   */
+//	  private void triggerEvent(BaseEventTypeNode event) {
+//		  // Trigger event
+//		  final DateTime now = DateTime.currentTime();
+//		  // Use your own EventId to keep track of your events, if you need to (for example when alarms
+//		  // are acknowledged)
+//		  ByteString myEventId = getNextUserEventId();
+//		  // If you wish, you can record the full event ID that is provided by triggerEvent, although your
+//		  // own 'myEventId' is usually enough to keep track of the event.
+//		  /* ByteString fullEventId = */event.triggerEvent(now, now, myEventId);
+//	  }
 }
