@@ -74,14 +74,14 @@ public class AppMethodManagerListener implements CallableListener {
 				//Set DemoServer's variable to MANUAL. AppServer's one will be updated by IoManager
 				client.writeValue(varId, "MANUAL");
 				//System.out.println("varNode set to 'MANUAL'");
-			}else if(names[1].contains("TriggerAlarm")){
+			} else /*if(names[1].contains("TriggerAlarm")){
 				System.out.println("alarm triggered");
 				OffNormalAlarmTypeNode  ev = appNodeManager.createEvent(OffNormalAlarmTypeNode.class);
 				ev.triggerEvent(null);
 				UaVariable L300_measurement = appNodeManager.getVariable(2,"L300","MeasVal");
 				client.writeValue(L300_measurement.getNodeId(), true);
 
-			}else {
+			} else */{
 				//Invalid method name
 				//System.out.println("invalid method called");
 				return false;

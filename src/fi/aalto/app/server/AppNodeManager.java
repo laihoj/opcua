@@ -75,7 +75,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		TypeDefinitionBasedNodeBuilderConfiguration.Builder conf =TypeDefinitionBasedNodeBuilderConfiguration.builder();
 		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.TopologyElementType, UaQualifiedName.from("http://opcfoundation.org/UA/DI/", "ParameterSet")));
 		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.TopologyElementType, UaQualifiedName.from("http://opcfoundation.org/UA/DI/", "MethodSet")));
-		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.TopologyElementType, UaQualifiedName.from("http://opcfoundation.org/UA/DI/", "TriggerAlarm")));
+//		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.TopologyElementType, UaQualifiedName.from("http://opcfoundation.org/UA/DI/", "TriggerAlarm")));
 		this.setNodeBuilderConfiguration(conf.build());
 		
 		
