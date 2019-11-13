@@ -1,5 +1,6 @@
 package fi.aalto.app.server;
 
+import com.prosysopc.ua.ServiceException;
 import com.prosysopc.ua.StatusException;
 import com.prosysopc.ua.client.UaClient;
 import com.prosysopc.ua.server.EventManager;
@@ -7,11 +8,14 @@ import com.prosysopc.ua.server.EventManagerListener;
 import com.prosysopc.ua.server.MonitoredEventItem;
 import com.prosysopc.ua.server.ServiceContext;
 import com.prosysopc.ua.server.Subscription;
+import com.prosysopc.ua.server.SubscriptionManager;
 import com.prosysopc.ua.server.UaServer;
 import com.prosysopc.ua.stack.builtintypes.ByteString;
 import com.prosysopc.ua.stack.builtintypes.DateTime;
 import com.prosysopc.ua.stack.builtintypes.LocalizedText;
 import com.prosysopc.ua.stack.builtintypes.NodeId;
+import com.prosysopc.ua.stack.builtintypes.UnsignedByte;
+import com.prosysopc.ua.stack.builtintypes.UnsignedInteger;
 import com.prosysopc.ua.stack.core.EventFilter;
 import com.prosysopc.ua.stack.core.EventFilterResult;
 import com.prosysopc.ua.stack.core.MonitoringMode;
@@ -86,8 +90,51 @@ public class AppEventManagerListener implements EventManagerListener {
 	  @Override
 	  public void onAfterCreateMonitoredEventItem(ServiceContext serviceContext, Subscription subscription,
 	      MonitoredEventItem item) {
-		  System.out.println("Monitored event item created");	
+//		  System.out.println("ServiceContext " + serviceContext.);
+//		  System.out.println("Subscription " + subscription);
+//		  System.out.println("Monitored event item created " + item);
+//		  System.out.println("item Subscription " + item.getSubscription());
+		  SubscriptionManager subscriptionManager = server.getSubscriptionManager();
+          UnsignedInteger id = new UnsignedInteger(subscriptionManager.getSubscriptionCount() + 1);
+          Boolean publishingEnabled = true;
+          Double requestedPublishingInterval = (double) 500;
+          UnsignedInteger requestedLifetimeCount = new UnsignedInteger(2400);
+          UnsignedInteger requestedMaxKeepAliveCount = new UnsignedInteger(10);
+          UnsignedInteger maxNotificationsPerPublish = new UnsignedInteger(50000);
+          UnsignedByte priority = new UnsignedByte(0);
+          Subscription sub = new Subscription(subscriptionManager,
+							                  id,
+							                  publishingEnabled,
+							                  requestedPublishingInterval,
+							                  requestedLifetimeCount,
+							                  requestedMaxKeepAliveCount,
+							                  maxNotificationsPerPublish,
+							                  priority);
+          
+        		  
+////		  UnsignedInteger
+////////		  SubscriptionManager manager
+//////		  int count = manager.getSubscriptionCount();
+//		  new Subscription(manager, count, true, 500, (UnsignedInteger)2400, (UnsignedInteger)10, (UnsignedInteger)50000, 0);
+		  subscription.addItem(item, item.getMonitoredItemId());
+		  EventFilterResult filterResult = item.getEventFilterResult();
+		  EventFilter eventFilter = item.getEventFilter();
 		  
+		  
+		  
+//		  System.out.println("isPublishingEnabled "+subscription.isPublishingEnabled());
+//		  System.out.println("getSelectClauseResults "+filterResult.getSelectClauseResults().);
+//		  System.out.println("getWhereClauseResult "+filterResult.getWhereClauseResult());
+//		  System.out.println("getSelectClauses "+eventFilter.getSelectClauses());
+//		  System.out.println("getWhereClause "+eventFilter.getWhereClause());
+		  
+		try {
+			subscription.addEventItem(serviceContext, item.getNodeId(), eventFilter, filterResult);
+			sub.addEventItem(serviceContext, item.getNodeId(), eventFilter, filterResult);
+		} catch (StatusException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		  //Looks like there is a conflict between server and client libraries
 		  /*Subscription sub = new Subscription();
 		  MonitoredDataItem itemMonitored = new MonitoredDataItem(nodeId, attributeId, MonitoringMode.Reporting);
@@ -98,7 +145,16 @@ public class AppEventManagerListener implements EventManagerListener {
 	  @Override
 	  public void onAfterDeleteMonitoredEventItem(ServiceContext serviceContext, Subscription subscription,
 	      MonitoredEventItem item) {
-		  System.out.println("Monitored event item deleted");
+		  try {
+			subscription.removeItem(item.getMonitoredItemId());
+		} catch (ServiceException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (StatusException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+//		  System.out.println("Monitored event item deleted");
 	    //
 	  }
 

@@ -6,12 +6,18 @@ import com.prosysopc.ua.stack.builtintypes.DateTime;
 import com.prosysopc.ua.stack.builtintypes.NodeId;
 import com.prosysopc.ua.stack.builtintypes.QualifiedName;
 import com.prosysopc.ua.stack.builtintypes.Variant;
+import com.prosysopc.ua.stack.core.BrowseDescription;
+import com.prosysopc.ua.stack.core.BrowseDirection;
+import com.prosysopc.ua.stack.core.BrowseResult;
 import com.prosysopc.ua.stack.core.Identifiers;
 import com.prosysopc.ua.stack.core.ReferenceDescription;
 import com.prosysopc.ua.typedictionary.FieldSpecification;
 import com.prosysopc.ua.types.opcua.server.AlarmConditionTypeNode;
 import com.prosysopc.ua.types.opcua.server.BaseEventTypeNode;
 import com.prosysopc.ua.client.MonitoredDataItemListener;
+import com.prosysopc.ua.client.UaClient;
+import com.prosysopc.ua.ServiceException;
+import com.prosysopc.ua.client.AddressSpace;
 import com.prosysopc.ua.client.MonitoredDataItem;
 import com.prosysopc.ua.server.EventManager;
 import com.prosysopc.ua.server.UaServer;
@@ -22,10 +28,12 @@ import com.prosysopc.ua.nodes.UaVariable;
 
 public class AppMonitoredDataItemListener implements MonitoredDataItemListener {
 
-	UaServer server; 
+	UaServer server;
+	UaClient client;
 	
-	public AppMonitoredDataItemListener (UaServer server) {
-	    this.server = server;
+	public AppMonitoredDataItemListener (UaServer server, UaClient client) {
+		this.server = server;
+		this.client = client;
 	}
 	
 	@Override
@@ -45,31 +53,70 @@ public class AppMonitoredDataItemListener implements MonitoredDataItemListener {
 		    AlarmConditionTypeNode alarm = (AlarmConditionTypeNode) ref.getTargetNode(); //alarm
 		    
 		    if (alarm.getTypeDefinition().getNodeId().equals(Identifiers.OffNormalAlarmType)) {
-		    	System.out.println("onDataChange : OffNormalAlarmType");
+//		    	System.out.println("onDataChange : OffNormalAlarmType");
 			    
 		    	/*VERY complicated way to get the normalStateValue....*/
 			    UaProperty normalStateProperty = alarm.getProperty(new QualifiedName("NormalState"));	//Get property (which stores "normal node"'s nodeId)
 			    NodeId normalStateNodeId = NodeId.parseNodeId(normalStateProperty.getValue().getValue().toString());	//Get "normal node"'s nodeId
 			    UaVariable normalStateNode = (UaVariable) server.getAddressSpace().getNode(normalStateNodeId);	//Get normal node
 			    Variant normalStateValue = normalStateNode.getValue().getValue();	//Finally get normal value
+			    
+			    
+			    /*get the demoserver alarm variable*/
+			    UaVariable demoalarm=(UaVariable) alarm.getComponent(new QualifiedName(ns, "AlrmEvtOn"));
+//			    AddressSpace sourceAddressSpace = client.getAddressSpace();
+//			    UaVariable nodeToAssign = (UaVariable) sourceAddressSpace.getNode(demoalarm.getNodeId(), UaNode.class);
 
-			    if(!node.getValue().getValue().equals(normalStateValue)) {
+		    	if(!node.getValue().getValue().equals(normalStateValue)) {
 			    	//The variable is not in normal mode -> need to trigger the alarm
 			    	System.out.println("onDataChange : OffNormalAlarmType triggered");
 			    	System.out.println("(Normal value='"+normalStateValue+"', observed='"+node.getValue().getValue()+"')");
 			    	triggerEvent(alarm);
-			    }
+			    	client.writeValue(demoalarm.getNodeId(), true);
+			    } else 
+			    	client.writeValue(demoalarm.getNodeId(), false);
+			    
+			    	
 		    }
 		    else if (alarm.getTypeDefinition().getNodeId().equals(Identifiers.NonExclusiveLimitAlarmType)) {
-		    	System.out.println("onDataChange : NonExclusiveLimitAlarmType");
-		    	//TODO: Logic to check if alarm needs to trigger
-		    	/*
-			     * TODO: find the lowlow low high highhigh limits to compare against for triggering the alarm
-			     * */
-		    	//triggerEvent(alarm);
+//		    	System.out.println("onDataChange : NonExclusiveLimitAlarmType");
+		    	
+		    	/*looks like the limit variables are not found because of wrong name space number*/
+		    	UaVariable lalrm=(UaVariable) alarm.getComponent(new QualifiedName(ns, "AlrmEvtL"));
+		    	UaVariable llalrm=(UaVariable) alarm.getComponent(new QualifiedName(ns, "AlrmEvtLL"));
+		    	UaVariable halrm=(UaVariable) alarm.getComponent(new QualifiedName(ns, "AlrmEvtH"));
+		    	UaVariable hhalrm=(UaVariable) alarm.getComponent(new QualifiedName(ns, "AlrmEvtHH"));
+		    	
+		    	
+		    	if(node.getValue().getValue().doubleValue() > 100) {
+		    		alarm.setSeverity(999);
+		    		triggerEvent(alarm);
+		    		client.writeValue(hhalrm.getNodeId(), true);
+		    	} else 
+		    	if(node.getValue().getValue().doubleValue() > 75) {
+		    		alarm.setSeverity(749);
+		    		triggerEvent(alarm);
+		    		client.writeValue(halrm.getNodeId(), true);
+		    	} else
+		    	if(node.getValue().getValue().doubleValue() > 50) {
+		    		alarm.setSeverity(499);
+		    		triggerEvent(alarm);
+		    		client.writeValue(lalrm.getNodeId(), true);
+		    	} else
+		    	if(node.getValue().getValue().doubleValue() > 25) {
+		    		alarm.setSeverity(249);
+		    		triggerEvent(alarm);
+		    		client.writeValue(llalrm.getNodeId(), true);
+		    	} else {
+		    	
+			    	client.writeValue(hhalrm.getNodeId(), false);
+			    	client.writeValue(halrm.getNodeId(), false);
+			    	client.writeValue(lalrm.getNodeId(), false);
+			    	client.writeValue(llalrm.getNodeId(), false);
+		    	}
 		    }
 		} catch (Exception e) {
-		    System.out.println(e.getMessage());
+		    System.out.println("OnDataChange Exception: " + e.getMessage());
 	    }
 		
 		

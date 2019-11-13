@@ -12,6 +12,7 @@ import com.prosysopc.ua.stack.builtintypes.ExpandedNodeId;
 import com.prosysopc.ua.stack.builtintypes.LocalizedText;
 import com.prosysopc.ua.stack.builtintypes.NodeId;
 import com.prosysopc.ua.stack.builtintypes.QualifiedName;
+import com.prosysopc.ua.stack.builtintypes.UnsignedShort;
 import com.prosysopc.ua.stack.common.NamespaceTable;
 import com.prosysopc.ua.stack.common.ServiceResultException;
 import com.prosysopc.ua.stack.core.Identifiers;
@@ -61,6 +62,7 @@ import com.prosysopc.ua.server.nodes.UaMethodNode;
 import com.prosysopc.ua.server.nodes.UaObjectNode;
 import com.prosysopc.ua.server.nodes.UaObjectTypeNode;
 import com.prosysopc.ua.client.AddressSpace;
+import com.prosysopc.ua.client.AddressSpaceException;
 import com.prosysopc.ua.client.UaClient;
 import com.prosysopc.ua.client.nodes.UaMethodImpl;
 
@@ -186,15 +188,13 @@ public class AppNodeManager extends NodeManagerUaNode {
 			assignOffNormalAlarm(ns,"M200","IntActive","AlrmEvtMsq",client);	//The 'q' of AlrmEvtMsq is not an error...
 			
 			//P300 Pressure sensor
-			UaNode P300 = getDevice(ns,"P300");
-			UaNode parameterSet = getParameterSet(ns,"P300");
-			UaVariable P300_measurement = getVariable(ns,"P300","ZeroMeas");
-			createNonExclusiveLimitAlarmNode(P300_measurement , (UaObjectNode)P300, parameterSet).setMessage(new LocalizedText("P300: (L) Boiler pressure at 0.0bar(g)"));
+			assignNonExclusiveLimitAlarm(ns, "P300", "MeasVal", "AlrmEvtMsg", client);
 			
 			//PIC300 Pump
 			assignOffNormalAlarm(ns,"PIC300","Enable","AlrmEvtMsq",client);
 			
 			//T300 Temperature sensor
+			assignNonExclusiveLimitAlarm(ns, "T300", "MeasVal", "AlrmEvtMsg", client);
 			
 			//Y301 Cut-off valve
 			assignOffNormalAlarm(ns,"Y301","CtrlVal","AlrmEvtMsq",client);
@@ -284,6 +284,17 @@ public class AppNodeManager extends NodeManagerUaNode {
 		}
 	}
 	
+	
+	private void assignNonExclusiveLimitAlarm(int ns, String deviceName, String measurementVarName, String messageVarName, UaClient client) throws StatusException, ServiceException {
+		UaNode deviceNode = getDevice(ns,deviceName);	//Get device's node
+
+		UaVariable measurementVar=getVariable(ns,deviceName,measurementVarName);	//Get measurement node from AppServer
+		
+		NodeId messageVarId=new NodeId(ns,deviceName+"_"+messageVarName);
+		DataValue messageVal=client.readValue(messageVarId);	//Get msg value from DemoServer bc not copied in AppServer
+		createNonExclusiveLimitAlarmNode(ns, measurementVar,(UaObjectNode) deviceNode,/*(double) 0,(double)1,(double)2,(double)3, */messageVarName);
+	}
+	
 	private void assignOffNormalAlarm(int ns, String deviceName, String measurementVarName, String messageVarName, UaClient client) throws StatusException, ServiceException {
 		UaNode deviceNode = getDevice(ns,deviceName);	//Get device's node
 
@@ -304,7 +315,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 		normalStateNode.setBrowseName(new QualifiedName(deviceName+"_normal"));
 		deviceNode.addComponent(normalStateNode);
 
-		createOffNormalAlarmNode(measurementVar, deviceNode, normalStateNodeId,messageVal.getValue().toString());
+		createOffNormalAlarmNode(ns, measurementVar, deviceNode, normalStateNodeId,messageVal.getValue().toString(), client);
 	}
 	
 	private void assignOtherVar(int ns, UaVariable nodeToAssign) throws StatusException {
@@ -376,19 +387,14 @@ public class AppNodeManager extends NodeManagerUaNode {
 		srv.getAddressSpace().loadModel(new File("appserver.xml").toURI());
 	}
 	
-	private OffNormalAlarmTypeNode createOffNormalAlarmNode(UaVariable source, UaNode device, NodeId normalState, String message) throws StatusException, UaInstantiationException {
-		int ns = this.getNamespaceIndex();
+	private OffNormalAlarmTypeNode createOffNormalAlarmNode(int ns, UaVariable source, UaNode device, NodeId normalState, String message, UaClient client) throws StatusException, UaInstantiationException {
+//		int ns = this.getNamespaceIndex();
 		final NodeId myAlarmId = new NodeId(ns, device.getNodeId().getValue() + "_Alrm");
 		String name = device.getBrowseName().getName() + "_Alrm";
-		
-//		TypeDefinitionBasedNodeBuilderConfiguration.Builder conf = TypeDefinitionBasedNodeBuilderConfiguration.builder();
-//		this.setNodeBuilderConfiguration(conf.build());
 
 		OffNormalAlarmTypeNode myAlarm = createInstance(OffNormalAlarmTypeNode.class, name, myAlarmId);
 		myAlarm.setSource(source);
 		myAlarm.setInput(source);
-//		myAlarm.setSourceNode(source.getNodeId());
-//		myAlarm.setInputNode(source.getNodeId());
 		myAlarm.setSeverity(500);
 		myAlarm.setEnabled(true);
 		myAlarm.setAcked(false);
@@ -402,52 +408,90 @@ public class AppNodeManager extends NodeManagerUaNode {
 		device.addComponent(myAlarm); // addReference(...Identifiers.HasComponent...)
 		myAlarm.addReference(source, Identifiers.HasEventSource, false);
 		source.addReference(myAlarm, Identifiers.HasCondition, false);
-		device.addReference(source, Identifiers.HasEventSource, false);
 		getDeviceSet().addReference(device, Identifiers.HasEventSource, false);
-		getServer().getNodeManagerRoot().getObjectsFolder().addReference(device, Identifiers.HasNotifier, false);
-
-		   return myAlarm;
+		
+		
+		String alarmOnName = myAlarm.getBrowseName().getName() + "EvtOn";
+    	NodeId demoserveralarmId = new NodeId(ns, alarmOnName);
+		AddressSpace sourceAddressSpace = client.getAddressSpace();
+		try {
+			UaVariable nodeToAssign = (UaVariable) sourceAddressSpace.getNode(demoserveralarmId, UaNode.class);
+			
+			String[] names = nodeToAssign.getBrowseName().getName().split("_");
+			//Create and assign the variable to alarm
+			NodeId varId = new NodeId(ns,names[0]+"_"+names[1]);	//Unique NodeId for each var
+			createVariable(ns,names[1],varId,nodeToAssign.getValue().getValue(),nodeToAssign.getDataTypeId(),myAlarm);
+		} catch (ServiceException e) {
+			e.printStackTrace();
+		} catch (AddressSpaceException e) {
+			e.printStackTrace();
+		}
+		
+		return myAlarm;
 	}
 	
-	private NonExclusiveLimitAlarmType createNonExclusiveLimitAlarmNode(UaVariable source, UaObjectNode device, UaNode deviceSet) throws StatusException, UaInstantiationException {
-		int ns = this.getNamespaceIndex();
+	private NonExclusiveLimitAlarmType createNonExclusiveLimitAlarmNode(int ns,
+																		UaVariable source, 
+																		UaObjectNode device,
+																		/*double llLimit,
+																		double lLimit,
+																		double hLimit,
+																		double hhLimit,*/
+																		String message) throws StatusException, UaInstantiationException {
+		
+		String llLimitNodeName = device.getBrowseName().getName() + "_AlrmEvtLL";
+//		System.out.println("createNonExclusiveLimitAlarmNode ns: " + ns);
+		NodeId llLimitNodeId=new NodeId(ns,llLimitNodeName);	//NormalStateNode in AppServer
+		UaVariable llLimitNode=new PlainVariable<UaVariable>(this, llLimitNodeId, llLimitNodeName, LocalizedText.NO_LOCALE);
+		llLimitNode.setTypeDefinitionId(Identifiers.BaseDataVariableType);
+//		llLimitNode.setValue(llLimit);
+		llLimitNode.setBrowseName(new QualifiedName("AlrmEvtLL"));
+		llLimitNode.setDisplayName(new LocalizedText("AlrmEvtLL"));
+		
+		String lLimitNodeName = device.getBrowseName().getName() + "_AlrmEvtL";
+		NodeId lLimitNodeId=new NodeId(ns,lLimitNodeName);	//NormalStateNode in AppServer
+		UaVariable lLimitNode=new PlainVariable<UaVariable>(this, lLimitNodeId, lLimitNodeName, LocalizedText.NO_LOCALE);
+		lLimitNode.setTypeDefinitionId(Identifiers.BaseDataVariableType);
+//		lLimitNode.setValue(lLimit);
+		lLimitNode.setBrowseName(new QualifiedName("AlrmEvtL"));
+		
+		String hLimitNodeName = device.getBrowseName().getName() + "_AlrmEvtH";
+		NodeId hLimitNodeId=new NodeId(ns,hLimitNodeName);	//NormalStateNode in AppServer
+		UaVariable hLimitNode=new PlainVariable<UaVariable>(this, hLimitNodeId, hLimitNodeName, LocalizedText.NO_LOCALE);
+		hLimitNode.setTypeDefinitionId(Identifiers.BaseDataVariableType);
+//		hLimitNode.setValue(hLimit);
+		hLimitNode.setBrowseName(new QualifiedName("AlrmEvtH"));
+		
+		String hhLimitNodeName = device.getBrowseName().getName() + "_AlrmEvtHH";
+		NodeId hhLimitNodeId=new NodeId(ns,hhLimitNodeName);	//NormalStateNode in AppServer
+		UaVariable hhLimitNode=new PlainVariable<UaVariable>(this, hhLimitNodeId, hhLimitNodeName, LocalizedText.NO_LOCALE);
+		hhLimitNode.setTypeDefinitionId(Identifiers.BaseDataVariableType);
+//		hhLimitNode.setValue(hhLimit);
+		hhLimitNode.setBrowseName(new QualifiedName("AlrmEvtHH"));
+		
+		
 		final NodeId myAlarmId = new NodeId(ns, device.getNodeId().getValue() + "_Alrm");
 		String name = device.getBrowseName().getName() + "_Alrm";
 		
-		TypeDefinitionBasedNodeBuilderConfiguration.Builder conf = TypeDefinitionBasedNodeBuilderConfiguration.builder();
-		//these need to be added, but I dont know how to find LimitAlarmType
-//		conf.addOptional(UaBrowsePath.from(opc.ua.iec611313.Ids.LimitAlarmType, UaQualifiedName.standard("HighHighLimit")));
-////		conf.addOptional(UaBrowsePath.from(opc.ua.iec611313.Ids., UaQualifiedName.standard("HighHighLimit")));
-//		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.LimitAlarmType, UaQualifiedName.standard("HighLimit")));
-//		conf.addOptional(UaBrowsePath.from(opc.ua.di.server.Ids.LimitAlarmType, UaQualifiedName.standard("LowLimit")));
-//		conf.addOptional(UaBrowsePath.from(opc.ua.di.Ids.LimitAlarmType, UaQualifiedName.standard("LowLowLimit")));
-////		conf.addOptional(UaBrowsePath.from(Ids.LimitAlarmType, UaQualifiedName.standard("LowLowLimit")));
+		NonExclusiveLimitAlarmType myAlarm = createInstance(NonExclusiveLimitAlarmType.class, name, myAlarmId);
+		myAlarm.setSourceNode(source.getNodeId());
+		myAlarm.setInputNode(source.getNodeId());
 
-		   this.setNodeBuilderConfiguration(conf.build());
+		myAlarm.setMessage(new LocalizedText(message));
+		myAlarm.addComponent(llLimitNode);
+		myAlarm.addComponent(lLimitNode);
+		myAlarm.addComponent(hLimitNode);
+		myAlarm.addComponent(hhLimitNode);
+		myAlarm.setSeverity(new UnsignedShort(500));
+		myAlarm.setActiveState(new LocalizedText(message));
+   
+		device.addComponent(myAlarm); // addReference(...Identifiers.HasComponent...)
 
-		   NonExclusiveLimitAlarmType myAlarm = createInstance(NonExclusiveLimitAlarmType.class, name, myAlarmId);
-		   myAlarm.setSourceNode(source.getNodeId());
-//		   myAlarm.setSourceName(source.);
-		   // Input is the node which has the measurement that generates the alarm
-//		   myAlarm.setInput(source);
-		   myAlarm.setInputNode(source.getNodeId());
-
-		   myAlarm.setMessage(new LocalizedText("Level exceeded"));
-//		   myAlarm.setSeverity(500); // Medium level warning
-//		   myAlarm.setHighHighLimit(90.0);
-//		   myAlarm.setHighLimit(70.0);
-//		   myAlarm.setLowLimit(30.0);
-//		   myAlarm.setLowLowLimit(10.0);
-//		   myAlarm.setEnabled(true);
-		   device.addComponent(myAlarm); // addReference(...Identifiers.HasComponent...)
-
-		   // + HasCondition, the SourceNode of the reference should normally
-		   // correspond to the Source set above
-		   source.addReference(myAlarm, Identifiers.HasCondition, false);
-		   device.addReference(source, Identifiers.HasEventSource, false);
-
-//		   deviceSet.addReference(device, Identifiers.HasNotifier, false);
-		   return myAlarm;
+		// + HasCondition, the SourceNode of the reference should normally
+		// correspond to the Source set above
+		source.addReference(myAlarm, Identifiers.HasCondition, false);
+		device.addReference(source, Identifiers.HasEventSource, false);
+		return myAlarm;
 	}
 
 	public UaVariable getVariable(int ns,String deviceName, String variableName) throws StatusException {

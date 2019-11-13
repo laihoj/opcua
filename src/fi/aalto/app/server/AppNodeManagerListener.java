@@ -139,7 +139,7 @@ public class AppNodeManagerListener implements NodeManagerListener {
 		    String name = item.getNodeId().getValue().toString();
 		    //System.out.println("onCreateMonitoredDataItem: " + name);
 		    com.prosysopc.ua.client.MonitoredDataItem clientMonitoredDataItem = new com.prosysopc.ua.client.MonitoredDataItem(new NodeId(sourceNs, name), Attributes.Value, MonitoringMode.Reporting);
-		    clientMonitoredDataItem.setDataChangeListener(new AppMonitoredDataItemListener(this.server));
+		    clientMonitoredDataItem.setDataChangeListener(new AppMonitoredDataItemListener(this.server, this.client));
 		    com.prosysopc.ua.client.Subscription clientSubscription = client.getSubscriptions()[0];
 		    clientSubscription.addItem(clientMonitoredDataItem);
 		} catch (Exception e) {
