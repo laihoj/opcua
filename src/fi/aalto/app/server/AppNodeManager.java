@@ -30,11 +30,15 @@ import com.prosysopc.ua.types.opcua.server.OffNormalAlarmTypeNode;
 
 import fi.aalto.app.AppDeviceType;
 import fi.aalto.app.Ids;
+import opc.ua.di.FunctionalGroupType;
 //import jdk.internal.org.objectweb.asm.tree.MethodNode;
 import opc.ua.di.TopologyElementType;
 import opc.ua.di.UIElementType;
 import opc.ua.di.client.UIElementTypeImpl;
 import opc.ua.di.server.FunctionalGroupTypeNode;
+import opc.ua.iec611313.CtrlConfigurationType;
+import opc.ua.iec611313.server.CtrlConfigurationTypeNode;
+import opc.ua.iec611313.server.CtrlConfigurationTypeNodeBase;
 
 import com.prosysopc.ua.nodes.UaVariable;
 import com.prosysopc.ua.ModelException;
@@ -145,13 +149,13 @@ public class AppNodeManager extends NodeManagerUaNode {
 			/**PIC300 components organisation (2nd step)**/
 		    //The data about the tag PIC300 should follow the OPC UA Information Model for IEC 61131.3, release 1.00.
 		    //You can utilize the CtrlConfigurationType type.
-		    
-		    UaNode deviceNode=getDevice(ns,"PIC300");	//Get device node
-		    
+		    UaObjectNode deviceNode=(UaObjectNode) getDevice(ns,"PIC300");	//Get device node
+		    deviceNode.setTypeDefinitionId(NodeId.parseNodeId("ns=4;i=1001"));	//Set CtrlConfigurationType from generated model
 		    //GlobalVars functional group
-		    NodeId FuncGrpId = new NodeId(ns,"PIC300_GlobalVars");	//Id to identify the functional group
+		    NodeId FuncGrpId = new NodeId(ns,"PIC300_"+CtrlConfigurationType.GLOBAL_VARS);	//Id to identify the functional group
 		    FunctionalGroupTypeNode FuncGrpNode = new FunctionalGroupTypeNode(this, FuncGrpId,
-		    		new QualifiedName("GlobalVars"), new LocalizedText("GlobalVars"));	//Functional group node
+		    		new QualifiedName(CtrlConfigurationType.GLOBAL_VARS),
+		    		new LocalizedText(CtrlConfigurationType.GLOBAL_VARS));	//Functional group node
 		    FuncGrpNode.setDescription(new LocalizedText("Global components involved in PID process",Locale.ENGLISH));
 		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","CtrlOff"));	//Assign components to the group they belong to
 		    FuncGrpNode.addComponent(getVariable(ns,"PIC300","CtrlOn"));
@@ -168,9 +172,10 @@ public class AppNodeManager extends NodeManagerUaNode {
 		    deviceNode.addComponent(FuncGrpNode);	//Attach the group to the device
 		    
 		    //Configuration functional group
-		    FuncGrpId = new NodeId(ns,"PIC300_Configuration");	//Id to identify the functional group
+		    FuncGrpId = new NodeId(ns,"PIC300_"+CtrlConfigurationType.CONFIGURATION);	//Id to identify the functional group
 		    FuncGrpNode = new FunctionalGroupTypeNode(this, FuncGrpId,
-		    		new QualifiedName("Configuration"), new LocalizedText("Configuration"));	//Functional group node
+		    		new QualifiedName(CtrlConfigurationType.CONFIGURATION),
+		    		new LocalizedText(CtrlConfigurationType.CONFIGURATION));	//Functional group node
 		    FuncGrpNode.setDescription(new LocalizedText("Configuration components involved in PID process",Locale.ENGLISH));
 		    FuncGrpNode.addComponent(getMethod(ns,"PIC300","SetModeAuto"));	//Assign components to the group they belong to
 		    FuncGrpNode.addComponent(getMethod(ns,"PIC300","SetModeMan"));
@@ -190,7 +195,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 			//P300 Pressure sensor
 			assignNonExclusiveLimitAlarm(ns, "P300", "MeasVal", "AlrmEvtMsg", client);
 			
-			//PIC300 Pump
+			//PIC300 PID
 			assignOffNormalAlarm(ns,"PIC300","Enable","AlrmEvtMsq",client);
 			
 			//T300 Temperature sensor
@@ -283,7 +288,7 @@ public class AppNodeManager extends NodeManagerUaNode {
 			deviceNode.addComponent(componentNode);																//Attach the component to its device
 		}
 	}
-	
+
 	
 	private void assignNonExclusiveLimitAlarm(int ns, String deviceName, String measurementVarName, String messageVarName, UaClient client) throws StatusException, ServiceException {
 		UaNode deviceNode = getDevice(ns,deviceName);	//Get device's node
